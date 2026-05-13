@@ -118,7 +118,7 @@ class MessageBus:
 
     async def connect(self):
         await self._connect_nats()
-        await self._start_zmq_listener()
+#        await self._start_zmq_listener()   # TODO: later!
         print(f"{TAG} Node {self.node_id} connected. Local IP: {self.local_ip}")
 
     async def _connect_nats(self):
@@ -134,12 +134,12 @@ class MessageBus:
         await self.nc.subscribe(TOPIC_HEARTBEAT, cb=self._on_heartbeat)
         print(f"{TAG} Subscribed to nodes.{self.node_id} and {TOPIC_HEARTBEAT}")
 
-    async def _start_zmq_listener(self):
+    '''async def _start_zmq_listener(self):
         """Start a ZMQ ROUTER socket to receive direct messages from local peers."""
         self._zmq_router = self._zmq_ctx.socket(zmq.ROUTER)
         self._zmq_router.bind(f"tcp://0.0.0.0:{self.ZMQ_PORT}")
         asyncio.create_task(self._zmq_receive_loop())
-        print(f"{TAG} ZeroMQ listener on port {self.ZMQ_PORT}")
+        print(f"{TAG} ZeroMQ listener on port {self.ZMQ_PORT}")'''
 
     # ==================================================================
     # PEER MANAGEMENT
