@@ -1,6 +1,4 @@
 from dataclasses import dataclass
-from messagebus import MessageBus
-from node import Node
 
 
 TAG = "[Agent]"
@@ -12,7 +10,7 @@ class Message:
     originator_lan: str
     payload: dict
 
-def register(node: Node):
+def register(node):
     """Register agent's message handlers to the node's MessageBus."""
     node.bus.on("task_request", handle_task_request)
     node.bus.on("task_assignment", handle_task_assignment)
@@ -28,5 +26,5 @@ def handle_task_request(task_req: dict) -> dict:
     return {"msg": "ack" }
 
 
-def handle_task_assignment(bus: MessageBus, task_assignment: Message):
+def handle_task_assignment(task_assignment: Message):
     pass

@@ -17,7 +17,6 @@ import zmq.asyncio
 import nats
 from dataclasses import dataclass, asdict
 from typing import Callable, Optional
-from agent import ack_task_request
 
 TAG = "[MessageBus]"
 TOPIC_HEARTBEAT = "heartbeat"
@@ -54,6 +53,8 @@ def get_local_ip() -> str:
         s.close()
 
 
+# NOTE: This is probably not needed...
+'''
 def same_subnet(ip1: str, ip2: str, prefix_len: int = 24) -> bool:
     """Check if two IPs are on the same /24 subnet."""
     def to_int(ip):
@@ -61,7 +62,7 @@ def same_subnet(ip1: str, ip2: str, prefix_len: int = 24) -> bool:
         return sum(int(p) << (8 * (3 - i)) for i, p in enumerate(parts))
 
     mask = ((1 << 32) - 1) ^ ((1 << (32 - prefix_len)) - 1)
-    return (to_int(ip1) & mask) == (to_int(ip2) & mask)
+    return (to_int(ip1) & mask) == (to_int(ip2) & mask)'''
 
 
 class MessageBus:
@@ -76,7 +77,7 @@ class MessageBus:
         self.heartbeat_interval = heartbeat_interval
 
         # Peer registry: node_id → {"ip": ..., "status": ..., "last_seen": ..., "local": bool}
-        self.peers: dict[str, dict] = {}
+        self.peers: dict[str, dict] = {} #NOTE: Is this needed? Change to a list of tuples instead?
 
         self._handlers: dict[str, Callable] = {}
         self._peer_callbacks: list[Callable] = []
@@ -85,6 +86,7 @@ class MessageBus:
         self.nc = None
 
         # ZeroMQ
+        # TODO: make work!
         self._zmq_ctx = zmq.asyncio.Context()
         self._zmq_router: Optional[zmq.asyncio.Socket] = None  # listens for incoming
         self._zmq_dealers: dict[str, zmq.asyncio.Socket] = {}  # node_id → dealer socket
@@ -187,16 +189,16 @@ class MessageBus:
         Currently there is only one callback registered by the Node class to just print the new peer info.
         """
 
-        is_local = same_subnet(self.local_ip, ip)
+        #is_local = same_subnet(self.local_ip, ip)
         existed = node_id in self.peers
         self.peers[node_id] = {
             "ip": ip,
             "lan": lan,
             "last_seen": asyncio.get_event_loop().time(),
-            "local": is_local,
+        #    "local": is_local,
         }
         if not existed:
-            transport = "ZeroMQ (direct)" if is_local else "NATS (via broker)"
+            transport = "ZeroMQ (direct)" if lan == self.lan else "NATS (via broker)"
             print(f"{TAG} New peer discovered: {node_id} @ {ip} — transport: {transport}")
             for cb in self._peer_callbacks:
                 cb(node_id, self.peers[node_id])

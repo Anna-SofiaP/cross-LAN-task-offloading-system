@@ -11,12 +11,12 @@ Run this file directly to start a node:
     python node.py
 """
 
+import task_originator
+import monitor
 import asyncio
 #import argparse
 from messagebus import MessageBus
 import agent
-import monitor
-import task_originator
 import yaml
 
 TAG = "[Node]"
@@ -44,7 +44,7 @@ class Node:
         await self.bus.connect()
 
         # Register incoming message handlers
-        agent.register(self)
+        #agent.register(self)
 
         # Start background loops concurrently
         await asyncio.gather(
@@ -81,6 +81,7 @@ if __name__ == "__main__":
                 nats_url = config["nats-url"])
 
     try:
+        agent.register(node)    # Register message handlers
         asyncio.run(node.start())
     except KeyboardInterrupt:
         print(f"\n{TAG} Node {config["nid"]} shutting down.")

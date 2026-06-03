@@ -5,10 +5,11 @@ import json
 from random import random
 from time import time
 import uuid
-from node import Node
+from xml.dom import Node
 
 
-TASK_TYPES         = ["CLASSIFICATION", "CV_INFERENCE", "TIMESERIES"]
+TASK_TYPES          = ["CLASSIFICATION", "CV_INFERENCE", "TIMESERIES"]
+TAG                 = "[ORIG]"
 
 @dataclass
 class Message:
@@ -18,14 +19,14 @@ class Message:
     payload: dict
 
 
-async def run_negotiation(node: Node, task_req: Message) -> dict:
-    print(f"\n[ORIG] Running negotiation for task {task_req.payload['task_id']}...")
+async def run_negotiation(node, task_req: Message) -> dict:
+    print(f"\n{TAG} Running negotiation for task {task_req.payload['task_id']}...")
 
     broadcast_start = time.time()   # T1: first TASK_REQUEST sent
     sent = []
 
     for lan, node_id in node.peers:
-        print(f"[ORIG] Sending task request to peer {node_id}...")
+        print(f"{TAG} Sending task request to peer {node_id}...")
 
         acked = False
         for attempt in range(1, 4):
@@ -33,19 +34,19 @@ async def run_negotiation(node: Node, task_req: Message) -> dict:
                 ack_msg = await node.bus.request((node_id, lan), task_req)
                 if ack_msg and ack_msg.payload.get("msg") == "ack":
                     sent.append(node_id)
-                    print(f"[ORIG] TASK_REQUEST acked by {node_id}")
+                    print(f"{TAG} TASK_REQUEST acked by {node_id}")
                     acked = True
                     break
                 break
             except Exception as e:
-                print(f"[ORIG] {node_id} attempt {attempt}/3: {e}")
+                print(f"{TAG} {node_id} attempt {attempt}/3: {e}")
                 if attempt < 3:
                     await asyncio.sleep(2)
         if not acked:
-            print(f"[ORIG] Could not reach {node_id} after 3 attempts -- skipping")
+            print(f"{TAG} Could not reach {node_id} after 3 attempts -- skipping")
 
     if not sent:
-        print("[ORIG] No nodes acknowledged -- skipping")
+        print(f"{TAG} No nodes acknowledged -- skipping")
         return None
 
     return {"results": "Negotiation results (placeholder)"}
@@ -61,9 +62,9 @@ async def start(node: Node):
         task_id = str(uuid.uuid4())[:8]
         task_type = next(task_cycle)
 
-        print(f"\n[ORIG] {'='*52}")
-        print(f"[ORIG] New task: task id={task_id}, type={task_type}")
-        print(f"[ORIG] {'='*52}")
+        print(f"\n{TAG} {'='*52}")
+        print(f"{TAG} New task: task id={task_id}, type={task_type}")
+        print(f"{TAG} {'='*52}")
 
         task_req = Message(
             type="task_request",
@@ -75,5 +76,6 @@ async def start(node: Node):
             }
         )
 
-        negotiation_results = await run_negotiation(node, task_req)
-        print(f"[ORIG] Negotiation results: {negotiation_results}")
+        #negotiation_results = await run_negotiation(node, task_req)
+        negotiation_results = {"results": "Negotiation results (placeholder)"}
+        print(f"{TAG} Negotiation results: {negotiation_results}")
