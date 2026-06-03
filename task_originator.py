@@ -30,7 +30,7 @@ async def run_negotiation(node, task_req: Message) -> dict:
         acked = False
         for attempt in range(1, 4):
             try:
-                ack_msg = await node.bus.request((node_id, lan), task_req)
+                ack_msg = await node.bus.request((lan, node_id), task_req)
                 if ack_msg and ack_msg.payload.get("msg") == "ack":
                     sent.append(node_id)
                     print(f"{TAG} TASK_REQUEST acked by {node_id}")
