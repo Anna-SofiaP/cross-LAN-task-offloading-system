@@ -14,9 +14,9 @@ Run this file directly to start a node:
 import asyncio
 #import argparse
 from messagebus import MessageBus
-#import agent
+import agent
 import monitor
-#import task_originator
+import task_originator
 import yaml
 
 TAG = "[Node]"
@@ -28,9 +28,10 @@ class Node:
         # Identity and state
         self.id = node_id
         self.lan = lan
+        self.peers = []  # tuple: ("lan": str, "node_id": node_id)
 
         # Communication layer
-        self.bus = MessageBus(node_id=self.id, nats_url=nats_url)
+        self.bus = MessageBus(node_id=node_id, nats_url=nats_url, lan=lan)
 
         # Callbacks and handlers
         self.bus.on_peer_update(self._on_peer_update)
@@ -43,13 +44,14 @@ class Node:
         await self.bus.connect()
 
         # Register incoming message handlers
-#        agent.register(self)
+        agent.register(self)
 
         # Start background loops concurrently
         await asyncio.gather(
             monitor.start(self),
-#            task_originator.start(self),
+            task_originator.start(self),
         )
+
 
     def _on_peer_update(self, node_id: str, info: dict):
         transport = "ZeroMQ (direct)" if info.get("local") else "NATS (via broker)"
@@ -58,15 +60,12 @@ class Node:
                 LAN: {info['lan']} \
                 IP: {info['ip']} \
                 via: {transport}")
+        
+        self.peers.append((info['lan'], node_id))
 
 
 
 if __name__ == "__main__":
-#    parser = argparse.ArgumentParser(description="Start a cluster node")
-#    parser.add_argument("--id", required=True, help="Unique node ID, e.g. node-a1")
-#    parser.add_argument("--nats-local", required=True, help="NATS local server URL, e.g. nats://192.168.1.10:4222")
-#    args = parser.parse_args()
-
     config = {}
 
     with open(CONFIG_FILE) as stream:
