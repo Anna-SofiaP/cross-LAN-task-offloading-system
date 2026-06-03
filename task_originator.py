@@ -1,0 +1,79 @@
+import asyncio
+from dataclasses import dataclass
+import itertools
+import json
+from random import random
+from time import time
+import uuid
+from node import Node
+
+
+TASK_TYPES         = ["CLASSIFICATION", "CV_INFERENCE", "TIMESERIES"]
+
+@dataclass
+class Message:
+    type: str
+    originator_node: str
+    originator_lan: str
+    payload: dict
+
+
+async def run_negotiation(node: Node, task_req: Message) -> dict:
+    print(f"\n[ORIG] Running negotiation for task {task_req.payload['task_id']}...")
+
+    broadcast_start = time.time()   # T1: first TASK_REQUEST sent
+    sent = []
+
+    for lan, node_id in node.peers:
+        print(f"[ORIG] Sending task request to peer {node_id}...")
+
+        acked = False
+        for attempt in range(1, 4):
+            try:
+                ack_msg = await node.bus.request((node_id, lan), task_req)
+                if ack_msg and ack_msg.payload.get("msg") == "ack":
+                    sent.append(node_id)
+                    print(f"[ORIG] TASK_REQUEST acked by {node_id}")
+                    acked = True
+                    break
+                break
+            except Exception as e:
+                print(f"[ORIG] {node_id} attempt {attempt}/3: {e}")
+                if attempt < 3:
+                    await asyncio.sleep(2)
+        if not acked:
+            print(f"[ORIG] Could not reach {node_id} after 3 attempts -- skipping")
+
+    if not sent:
+        print("[ORIG] No nodes acknowledged -- skipping")
+        return None
+
+    return {"results": "Negotiation results (placeholder)"}
+
+
+
+async def start(node: Node):
+    """Start the Task Originator loop. This will periodically create new tasks and submit them to the MessageBus."""
+    task_cycle = itertools.cycle(TASK_TYPES)    # NOTE: just for now, for testing.
+
+    while True:
+        # For testing, we just create random tasks
+        task_id = str(uuid.uuid4())[:8]
+        task_type = next(task_cycle)
+
+        print(f"\n[ORIG] {'='*52}")
+        print(f"[ORIG] New task: task id={task_id}, type={task_type}")
+        print(f"[ORIG] {'='*52}")
+
+        task_req = Message(
+            type="task_request",
+            originator_node=node.id,
+            originator_lan=node.lan,
+            payload={
+                "task_id": task_id,
+                "task_type": task_type
+            }
+        )
+
+        negotiation_results = await run_negotiation(node, task_req)
+        print(f"[ORIG] Negotiation results: {negotiation_results}")
