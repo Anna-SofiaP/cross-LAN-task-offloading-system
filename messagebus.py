@@ -117,6 +117,7 @@ class MessageBus:
     
     async def request(self, to: tuple, msg: Message, timeout: float = 3.0) -> Message:
         """Send a message and wait for a reply. Transport chosen automatically."""
+
         lan, topic = to
         print(f"{TAG} Sending request to {topic} in LAN {lan} with timeout {timeout}s")
         #if self._is_local(lan):
@@ -150,6 +151,8 @@ class MessageBus:
 
     async def _connect_nats(self):
         """Connect to NATS server and subscribe to necessary subjects."""
+        print(f"{TAG} Connecting to NATS at {self.nats_url}...")
+
         self.nc = await nats.connect(
             self.nats_url,
             reconnected_cb=self._on_nats_reconnect,
@@ -162,7 +165,7 @@ class MessageBus:
         #await self.nc.subscribe(TOPIC_TASK_REQUEST, cb=self._on_task_request)
         # Subscribe to cluster-wide heartbeats
         await self.nc.subscribe(TOPIC_HEARTBEAT, cb=self._on_heartbeat)
-        print(f"{TAG} Subscribed to nodes.{self.node_id}, {TOPIC_TASK_REQUEST}, and {TOPIC_HEARTBEAT}")
+        print(f"{TAG} Subscribed to nodes.{self.node_id} and {TOPIC_HEARTBEAT}")
 
     # TODO: do some kind of connecting to a ZMQ socket here!
     '''async def _start_zmq_listener(self):
@@ -224,11 +227,13 @@ class MessageBus:
 
     async def _request_nats(self, topic: str, msg: Message, timeout: float) -> Message:
         try:
+            print(f"{TAG} Sending NATS request to {topic} with payload: {msg.payload}")
             reply = await self.nc.request(
                 f"nodes.{topic}",
                 json.dumps(asdict(msg)).encode(),
                 timeout=timeout,
             )
+            print(f"\n{TAG} Received NATS reply from {topic}: {reply.data.decode()}")
             response = Message("ack", self.node_id, self.lan, payload=json.loads(reply.data.decode()))
             return response
         except Exception as e:
@@ -239,6 +244,8 @@ class MessageBus:
 
     async def _on_nats_message(self, raw_msg):
         """Dispatch an incoming NATS direct message to the registered handler."""
+        print(f"{TAG} Received NATS message on {raw_msg.subject}: {raw_msg.data.decode()}")
+
         try:
             msg = Message(**json.loads(raw_msg.data.decode()))
             print(f"{TAG} Received NATS message of type {msg.type} from {raw_msg.subject}")
@@ -374,6 +381,7 @@ class MessageBus:
 
     
     async def _dispatch(self, msg: Message):
+        print(f"{TAG} Dispatching message of type {msg.type} to handler...")
         handler = self._handlers.get(msg.type)
         if handler:
             result = handler(msg.payload)
