@@ -5,7 +5,6 @@ import json
 from random import random
 from time import time
 import uuid
-from xml.dom import Node
 
 
 TASK_TYPES          = ["CLASSIFICATION", "CV_INFERENCE", "TIMESERIES"]
@@ -22,7 +21,7 @@ class Message:
 async def run_negotiation(node, task_req: Message) -> dict:
     print(f"\n{TAG} Running negotiation for task {task_req.payload['task_id']}...")
 
-    broadcast_start = time.time()   # T1: first TASK_REQUEST sent
+    #broadcast_start = time()   # T1: first TASK_REQUEST sent
     sent = []
 
     for lan, node_id in node.peers:
@@ -53,11 +52,14 @@ async def run_negotiation(node, task_req: Message) -> dict:
 
 
 
-async def start(node: Node):
+async def start(node):
     """Start the Task Originator loop. This will periodically create new tasks and submit them to the MessageBus."""
     task_cycle = itertools.cycle(TASK_TYPES)    # NOTE: just for now, for testing.
 
     while True:
+        print(f"\n{TAG} Waiting before creating next task...")
+        await asyncio.sleep(10)  # Simulate delay
+
         # For testing, we just create random tasks
         task_id = str(uuid.uuid4())[:8]
         task_type = next(task_cycle)
@@ -76,6 +78,6 @@ async def start(node: Node):
             }
         )
 
-        #negotiation_results = await run_negotiation(node, task_req)
-        negotiation_results = {"results": "Negotiation results (placeholder)"}
+        negotiation_results = await run_negotiation(node, task_req)
+        #negotiation_results = {"results": "Negotiation results (placeholder)"}
         print(f"{TAG} Negotiation results: {negotiation_results}")
