@@ -2,7 +2,7 @@
 
 Run the NATS-server with:
 ```bash
-$ nats-server
+$ sudo nats-server -c /path/to/your/nats/conf/file.conf
 ```
 
 In another terminal window, run the task allocator:
