@@ -23,6 +23,7 @@ def handle_task_request(task_req: dict) -> dict:
 
     print(f"\n{TAG} Received task request: task id={task_id}, type={task_type}")
 
+    # TODO: send back also originator_node id and originator_lan in the reply
     return {"msg": "ack" }
 
 
