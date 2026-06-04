@@ -28,7 +28,7 @@ class Node:
         # Identity and state
         self.id = node_id
         self.lan = lan
-        self.peers = []  # tuple: ("lan": str, "node_id": node_id)
+        self.peers = []  # tuple: ("lan": str, "node_id": node_id, "ip": str|None)
 
         # Communication layer
         self.bus = MessageBus(node_id=node_id, nats_url=nats_url, lan=lan)
@@ -61,7 +61,14 @@ class Node:
                 IP: {info['ip']} \
                 via: {transport}")
         
-        self.peers.append((info['lan'], node_id))
+
+        # If the peer is on the same LAN, add also IP address info for direct communication
+        if info['lan'] == self.lan:
+            print(f"{TAG} Peer {node_id} is on the same LAN -- adding for direct communication")
+            self.peers.append((info['lan'], node_id, info['ip']))
+        else:
+            print(f"{TAG} Peer {node_id} is on a different LAN -- adding for broker communication")
+            self.peers.append((info['lan'], node_id, None))
 
 
 
