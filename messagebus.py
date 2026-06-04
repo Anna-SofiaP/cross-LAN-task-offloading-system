@@ -21,6 +21,7 @@ from typing import Callable, Optional
 TAG = "[MessageBus]"
 TOPIC_HEARTBEAT = "heartbeat"
 TOPIC_TASK_REQUEST = "task_request"
+BID_TIMEOUT = 90.0
 
 
 @dataclass
@@ -53,17 +54,6 @@ def get_local_ip() -> str:
         s.close()
 
 
-# NOTE: This is probably not needed...
-'''
-def same_subnet(ip1: str, ip2: str, prefix_len: int = 24) -> bool:
-    """Check if two IPs are on the same /24 subnet."""
-    def to_int(ip):
-        parts = ip.split(".")
-        return sum(int(p) << (8 * (3 - i)) for i, p in enumerate(parts))
-
-    mask = ((1 << 32) - 1) ^ ((1 << (32 - prefix_len)) - 1)
-    return (to_int(ip1) & mask) == (to_int(ip2) & mask)'''
-
 
 class MessageBus:
     ZMQ_PORT = 5555
@@ -86,10 +76,7 @@ class MessageBus:
         self.nc = None
 
         # ZeroMQ
-        # TODO: make work!
-        self._zmq_ctx = zmq.asyncio.Context()
-        self._zmq_router: Optional[zmq.asyncio.Socket] = None  # listens for incoming
-        self._zmq_dealers: dict[str, zmq.asyncio.Socket] = {}  # node_id → dealer socket
+        self.ctx = zmq.Context()
 
     
     # ==================================================================
@@ -118,13 +105,15 @@ class MessageBus:
     async def request(self, to: tuple, msg: Message, timeout: float = 3.0) -> Message:
         """Send a message and wait for a reply. Transport chosen automatically."""
 
-        lan, topic = to
-        print(f"{TAG} Sending request to {topic} in LAN {lan} with timeout {timeout}s")
-        #if self._is_local(lan):
-        #    return await self._request_zmq(to, msg, timeout)
-        #else:
-        #    return await self._request_nats(to, msg, timeout)
-        return await self._request_nats(topic, msg, timeout)
+        lan, topic, ip = to
+        print(f"{TAG} Sending request to node {topic} in LAN {lan}")
+
+        if self._is_local(lan) and ip is not None:
+            print(f"{TAG} Using ZeroMQ for local request")
+            #return await self._request_zmq(ip, msg, timeout)
+        else:
+            print(f"{TAG} Using NATS for remote request")
+            return await self._request_nats(topic, msg, timeout)
 
 
     async def publish_heartbeat(self, lan: str):
@@ -143,9 +132,10 @@ class MessageBus:
     # ===============================================================
 
     async def connect(self):
-        """Connect to NATS server and start ZMQ listener."""
+        """Connect to NATS server and bind to ZMQ port."""
         await self._connect_nats()
-#        await self._start_zmq_listener()   # TODO: later!
+        await self._connect_to_zmq_sockets()
+
         print(f"{TAG} Node {self.node_id} connected. Local IP: {self.local_ip}")
 
 
@@ -165,15 +155,39 @@ class MessageBus:
         #await self.nc.subscribe(TOPIC_TASK_REQUEST, cb=self._on_task_request)
         # Subscribe to cluster-wide heartbeats
         await self.nc.subscribe(TOPIC_HEARTBEAT, cb=self._on_heartbeat)
-        print(f"{TAG} Subscribed to nodes.{self.node_id} and {TOPIC_HEARTBEAT}")
 
-    # TODO: do some kind of connecting to a ZMQ socket here!
-    '''async def _start_zmq_listener(self):
-        """Start a ZMQ ROUTER socket to receive direct messages from local peers."""
-        self._zmq_router = self._zmq_ctx.socket(zmq.ROUTER)
-        self._zmq_router.bind(f"tcp://0.0.0.0:{self.ZMQ_PORT}")
-        asyncio.create_task(self._zmq_receive_loop())
-        print(f"{TAG} ZeroMQ listener on port {self.ZMQ_PORT}")'''
+        print(f"\n{TAG} Subscribed to nodes.{self.node_id} and {TOPIC_HEARTBEAT}")
+
+
+    async def _connect_to_zmq_sockets(self):
+        """Connect to the local ZeroMQ socket for direct peer communication."""
+        #"""Start a ZMQ ROUTER socket to receive direct messages from local peers."""
+        #self._zmq_router = self._zmq_ctx.socket(zmq.ROUTER)
+        #self._zmq_router.bind(f"tcp://0.0.0.0:{self.ZMQ_PORT}")
+        #asyncio.create_task(self._zmq_receive_loop())
+        #print(f"{TAG} ZeroMQ listener on port {self.ZMQ_PORT}")
+
+        # TODO: these down below are for a pull socket. Make work if needed!
+        #self.pull_sock.setsockopt(zmq.RCVTIMEO, int(BID_TIMEOUT*1000))
+        #self.pull_sock.bind(f"tcp://0.0.0.0:{self.ZMQ_PORT}")
+
+        # REQ-REP sockets
+        print(f"{TAG} Setting up ZeroMQ REQ socket for outgoing requests...")
+        self.req_sock = self.ctx.socket(zmq.REQ)
+        self.req_sock.setsockopt(zmq.RCVTIMEO, 5000)
+        self.req_sock.setsockopt(zmq.LINGER, 0)
+
+        print(f"{TAG} Setting up ZeroMQ REP socket for incoming requests...")
+        self.rep_sock = self.ctx.socket(zmq.REP)
+        self.rep_sock.bind(f"tcp://0.0.0.0:{self.ZMQ_PORT}")
+
+        print(f"{TAG} ZeroMQ REQ socket bound on port {self.ZMQ_PORT}\n")
+
+        while True:
+            msg = json.loads(self.rep_sock.recv_string())
+            if msg:
+                await self._reply_zmq(msg)
+
 
 
     # ==================================================================
@@ -234,6 +248,8 @@ class MessageBus:
                 timeout=timeout,
             )
             print(f"\n{TAG} Received NATS reply from {topic}: {reply.data.decode()}")
+
+            # BUG: what should the originator_node and originator_lan be in the reply? Currently we just set them to the same as the request, but maybe they should be the topic's node_id and LAN?
             response = Message("ack", self.node_id, self.lan, payload=json.loads(reply.data.decode()))
             return response
         except Exception as e:
@@ -254,19 +270,6 @@ class MessageBus:
                 await self.nc.publish(raw_msg.reply, json.dumps(response).encode())
         except Exception as e:
             print(f"{TAG} Error handling NATS message: {e}")
-
-    '''
-    async def _on_task_request(self, raw_req):
-        """Handle an incoming cluster-wide task request."""
-        try:
-            task_req = Message(**json.loads(raw_req.data.decode()))
-            print(f"{TAG} Received task request: {task_req.type}, id={task_req.payload['task_type']} from {task_req.originator_node} in LAN {task_req.originator_lan}")
-            if task_req.originator_node == self.node_id:
-                return  # ignore own task 
-        
-            self._dispatch(task_req)
-        except Exception as e:
-            print(f"{TAG} Error handling task request: {e}")'''
             
 
     async def _on_heartbeat(self, raw_msg):
@@ -310,48 +313,52 @@ class MessageBus:
             sock.connect(f"tcp://{peer_ip}:{self.ZMQ_PORT}")
             self._zmq_dealers[node_id] = sock
             print(f"{TAG} ZMQ DEALER connected to {node_id} @ {peer_ip}:{self.ZMQ_PORT}")
-        return self._zmq_dealers[node_id]
+        return self._zmq_dealers[node_id]'''
 
-
+    '''
     async def _send_zmq(self, to: str, msg: Message):
+        #try:
+        #    sock = self._get_zmq_dealer(to)
+        #    payload = json.dumps({**asdict(msg), "reply_to": None}).encode()
+        #    await sock.send_multipart([b"", payload])
+        #except Exception as e:
+        #    print(f"{TAG} ZMQ send to {to} failed: {e}")'''
+
+    
+    async def _request_zmq(self, ip: str, msg: Message, timeout: float) -> Optional[Message]:
         try:
-            sock = self._get_zmq_dealer(to)
-            payload = json.dumps({**asdict(msg), "reply_to": None}).encode()
-            await sock.send_multipart([b"", payload])
+            self.req_sock.connect(f"tcp://{ip}:{self.ZMQ_PORT}")
+
+            req = json.dumps(dict(type=msg.type,
+                                  originator_node=msg.originator_node, 
+                                  originator_lan=msg.originator_lan),
+                                  task_id=msg.payload.get("task_id"), 
+                                  task_type=msg.payload.get("task_type")).encode()
+
+            self.req_sock.send_string(req)
+            ack = json.loads(self.req_sock.recv_string())
+
+            self.req_sock.close()
+
+            # BUG: change originator_node and originator_lan in the reply to be the actual sender's info instead of just echoing the request's originator info
+            return Message("ack", self.node_id, self.lan, payload=json.loads(ack.get("payload", "{}")))
         except Exception as e:
-            print(f"{TAG} ZMQ send to {to} failed: {e}")
+            print(f"{TAG} ZMQ request to {ip} failed: {e}")
+            raise
+    
 
-
-    async def _request_zmq(self, to: str, msg: Message, timeout: float) -> Optional[Message]:
-        """
-        Send a ZMQ message and wait for a reply.
-        Uses a temporary DEALER with a unique reply address embedded in the message.
-        """
+    async def _reply_zmq(self, msg):
         try:
-            reply_subject = f"zmq.reply.{self.node_id}.{id(msg)}"
-            reply_future: asyncio.Future = asyncio.get_event_loop().create_future()
-            self._handlers[reply_subject] = lambda p: reply_future.set_result(p) or {}
-
-            sock = self._get_zmq_dealer(to)
-            payload = json.dumps({
-                **asdict(msg),
-                "reply_to": reply_subject,
-                "from": self.node_id,
-            }).encode()
-            await sock.send_multipart([b"", payload])
-
-            await asyncio.wait_for(reply_future, timeout=timeout)
-            result = reply_future.result()
-            return Message(type="reply", payload=result)
-        except asyncio.TimeoutError:
-            print(f"{TAG} ZMQ request to {to} timed out")
-            return None
+            # TODO: change what is being sent back to the sender.
+            print(f"{TAG} Received ZMQ message of type {msg.get('type')} from {msg.get('originator_node')}")
+            response = await self._dispatch(msg)
+            if response is not None:
+                self.rep_sock.send_string(json.dumps(response).encode())
         except Exception as e:
-            print(f"{TAG} ZMQ request to {to} failed: {e}")
-            return None
-        finally:
-            self._handlers.pop(reply_subject, None)
+            print(f"{TAG} Error handling ZMQ message: {e}")
 
+
+    '''
     async def _zmq_receive_loop(self):
         """Continuously receive messages on the ROUTER socket."""
         while True:
