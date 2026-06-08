@@ -43,8 +43,6 @@ class Node:
         # Connect transport layer first
         await self.bus.connect()
 
-        print(f"{TAG} Connected to messagebus.")
-
         # Register incoming message handlers
         #agent.register(self)
 
@@ -60,19 +58,19 @@ class Node:
 
     def _on_peer_update(self, node_id: str, info: dict):
         transport = "ZeroMQ (direct)" if info.get("local") else "NATS (via broker)"
-        print(f"{TAG} Peer joined: \
-                Node ID: {node_id} \
-                LAN: {info['lan']} \
-                IP: {info['ip']} \
-                via: {transport}")
+        print(f"{TAG} Peer joined:" \
+                f"   Node ID: {node_id}" \
+                f"   LAN: {info['lan']}" \
+                f"   IP: {info['ip']}" \
+                f"   via: {transport}")
         
 
         # If the peer is on the same LAN, add also IP address info for direct communication
         if info['lan'] == self.lan:
-            print(f"{TAG} Peer {node_id} is on the same LAN -- adding for direct communication")
+            print(f"{TAG} Peer {node_id} is on the same LAN\n")
             self.peers.append((info['lan'], node_id, info['ip']))
         else:
-            print(f"{TAG} Peer {node_id} is on a different LAN -- adding for broker communication")
+            print(f"{TAG} Peer {node_id} is on a different LAN\n")
             self.peers.append((info['lan'], node_id, None))
 
 
@@ -83,7 +81,6 @@ if __name__ == "__main__":
     with open(CONFIG_FILE) as stream:
         try:
             config = yaml.safe_load(stream)
-            print(f"{TAG} Node configuration: \n{config}")
         except yaml.YAMLError as exc:
             print(exc)
 

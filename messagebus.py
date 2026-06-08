@@ -12,7 +12,7 @@ import asyncio
 import json
 import socket
 from xml.sax import handler
-import zmq
+#import zmq
 import zmq.asyncio
 import nats
 from dataclasses import dataclass, asdict
@@ -120,23 +120,20 @@ class MessageBus:
 
     async def global_request(self, to: tuple, msg: Message, timeout: float = 3.0) -> Message:
         lan, topic, ip = to
-        print(f"{TAG} Sending request to node {topic} in LAN {lan}")
-        print(f"{TAG} Using NATS for both remote and local request")
+        print(f"{TAG} Sending request to node {topic} in LAN {lan}\n")
         return await self._request_nats(topic, msg, timeout)
     
 
-    async def local_request(self, to: tuple, msg: Message):
+    async def local_request(self, to: tuple, msg: Message) -> Message:
         lan, topic, ip = to
-        print(f"{TAG} Sending request to node {topic} in LAN {lan}")
-        print(f"{TAG} Using ZeroMQ for local request")
+        print(f"{TAG} Sending request to node {topic} in LAN {lan}\n")
         return await self._send_zmq(ip, msg)
 
 
     async def publish_heartbeat(self, lan: str):
         """Broadcast a heartbeat to the whole cluster via NATS."""
-        print(f"{TAG} Publishing heartbeat signal...")
+        print(f"{TAG} Publishing heartbeat signal...\n")
         if self.nc is None:
-            print(f"{TAG} NATS client issue.")
             return
         await self.nc.publish(TOPIC_HEARTBEAT, json.dumps({
             "node_id": self.node_id,
@@ -178,14 +175,13 @@ class MessageBus:
             disconnected_cb=self._on_nats_disconnect,
             error_cb=self._on_nats_error,
         )
+
         # Subscribe to this node's direct subject
         await self.nc.subscribe(f"nodes.{self.node_id}", cb=self._on_nats_message)
-        # Subscribe to cluster-wide task requests
-        #await self.nc.subscribe(TOPIC_TASK_REQUEST, cb=self._on_task_request)
         # Subscribe to cluster-wide heartbeats
         await self.nc.subscribe(TOPIC_HEARTBEAT, cb=self._on_heartbeat)
 
-        print(f"\n{TAG} Subscribed to nodes.{self.node_id} and {TOPIC_HEARTBEAT}")
+        print(f"\n{TAG} Subscribed to nodes.{self.node_id} and {TOPIC_HEARTBEAT}\n")
 
 
     async def _connect_to_zmq_sockets(self):
@@ -229,7 +225,7 @@ class MessageBus:
         }
         if not existed:
             transport = "ZeroMQ (direct)" if lan == self.lan else "NATS (via broker)"
-            print(f"{TAG} New peer discovered: {node_id} @ {ip} — transport: {transport}")
+            print(f"{TAG} New peer discovered: {node_id} @ {ip} — transport: {transport}\n")
             for cb in self._peer_callbacks:
                 cb(node_id, self.peers[node_id])
 
@@ -260,7 +256,7 @@ class MessageBus:
                 json.dumps(asdict(msg)).encode(),
                 timeout=timeout,
             )
-            print(f"\n{TAG} Received NATS reply from {topic}: {reply.data.decode()}")
+            print(f"\n{TAG} Received NATS reply from {topic}: {reply.data.decode()}\n")
 
             # BUG: what should the originator_node and originator_lan be in the reply? Currently we just set them to the same as the request, but maybe they should be the topic's node_id and LAN?
             response = Message("ack", self.node_id, self.lan, payload=json.loads(reply.data.decode()))
@@ -273,11 +269,9 @@ class MessageBus:
 
     async def _on_nats_message(self, raw_msg):
         """Dispatch an incoming NATS direct message to the registered handler."""
-        print(f"{TAG} Received NATS message on {raw_msg.subject}: {raw_msg.data.decode()}")
-
         try:
             msg = Message(**json.loads(raw_msg.data.decode()))
-            print(f"{TAG} Received NATS message of type {msg.type} from {raw_msg.subject}")
+            print(f"{TAG} Received NATS message of type {msg.type} from {raw_msg.subject}\n")
             response = await self._dispatch(msg)
             if raw_msg.reply and response is not None:
                 await self.nc.publish(raw_msg.reply, json.dumps(response).encode())
@@ -293,7 +287,7 @@ class MessageBus:
             if node_id == self.node_id:
                 return  # ignore own heartbeat
             
-            print(f"{TAG} Received a heartbeat signal from a peer!")
+            print(f"{TAG} Received a heartbeat signal from a peer!\n")
             
             self._update_peer(node_id, data["lan"], data["ip"])
         except Exception as e:
@@ -302,12 +296,15 @@ class MessageBus:
 
     async def _on_nats_reconnect(self):
         print(f"{TAG} Reconnected to NATS")
+        print(f"{'-'*20}\n")
 
     async def _on_nats_disconnect(self):
         print(f"{TAG} Disconnected from NATS")
+        print(f"{'-'*20}\n")
 
     async def _on_nats_error(self, e):
         print(f"{TAG} NATS error: {e}")
+        print(f"{'-'*20}\n")
 
 
     # ==================================================================
@@ -364,7 +361,7 @@ class MessageBus:
 
     async def _zmq_listen_loop(self):
         """Runs as a background task — receives, dispatches, replies."""
-        print(f"{TAG} Starting ZeroMQ loop for receiving messages from peers...")
+        print(f"{TAG} Starting ZeroMQ loop for receiving messages from peers...\n")
         while True:
             try:
                 raw = await self.rep_sock.recv_string()
@@ -448,7 +445,7 @@ class MessageBus:
 
     
     async def _dispatch(self, msg: Message):
-        print(f"{TAG} Dispatching message of type {msg.type} to handler...")
+        print(f"{TAG} Dispatching message of type {msg.type} to handler...\n")
         handler = self._handlers.get(msg.type)
         if handler:
             result = handler(msg.payload)
@@ -456,5 +453,5 @@ class MessageBus:
                 result = await result
             return result
         else:
-            print(f"{TAG} No handler for message type: {msg.type}")
+            print(f"{TAG} No handler for message type: {msg.type}\n")
             return None

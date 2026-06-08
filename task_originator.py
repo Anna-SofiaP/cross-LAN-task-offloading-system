@@ -27,7 +27,7 @@ async def run_negotiation(node, task_req: Message) -> dict:
     bids = []
 
     for lan, node_id, ip in node.peers:
-        print(f"{TAG} Sending task request to peer {node_id}...")
+        print(f"{TAG} Sending task request to peer {node_id}...\n")
     
         ack_msg = None
         acked = False
@@ -40,18 +40,18 @@ async def run_negotiation(node, task_req: Message) -> dict:
                     #ack_msg = await node.bus.get_message()
                 if ack_msg and ack_msg.payload.get("msg") == "ack":
                     sent.append(node_id)
-                    print(f"{TAG} TASK_REQUEST acked by {node_id}")
+                    print(f"{TAG} TASK_REQUEST acked by {node_id}\n")
                     acked = True
                     break
             except Exception as e:
-                print(f"{TAG} {node_id} attempt {attempt}/3: {e}")
+                print(f"{TAG} {node_id} attempt {attempt}/3: {e}\n")
                 if attempt < 3:
                     await asyncio.sleep(2)
         if not acked:
             print(f"{TAG} Could not reach {node_id} after 3 attempts -- skipping")
     
     if not sent:
-        print(f"{TAG} No nodes acknowledged -- skipping")
+        print(f"{TAG} No nodes acknowledged -- skipping\n")
         return None
 
     return {"results": "Negotiation results (placeholder)"}
@@ -63,7 +63,6 @@ async def start(node):
     task_cycle = itertools.cycle(TASK_TYPES)    # NOTE: just for now, for testing.
 
     while True:
-        print(f"\n{TAG} Waiting before creating next task...")
         await asyncio.sleep(10)  # Simulate delay
 
         # For testing, we just create random tasks

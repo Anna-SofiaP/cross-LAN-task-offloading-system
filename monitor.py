@@ -23,19 +23,18 @@ HEARTBEAT_INTERVAL = 20
 
 async def heartbeat_loop(node: Node):
     """Broadcast this node's presence and status to the whole cluster."""
-    print(f"{TAG} Sending heartbeat signal to peers every {HEARTBEAT_INTERVAL} seconds.")
+    print(f"{TAG} Sending heartbeat signal to peers every {HEARTBEAT_INTERVAL} seconds.\n")
+
     while True:
         try:
             await node.bus.publish_heartbeat(lan=node.lan)
             print(
                 f"{TAG} Heartbeat sent. "
-                f"Known peers: {list(node.bus.peers.keys())}"
+                f"Known peers: {list(node.bus.peers.keys())}\n"
             )
         except Exception as e:
             print(f"{TAG} Heartbeat error: {e}")
-        print(f"{TAG} Sleeping for {HEARTBEAT_INTERVAL} seconds...")
         await asyncio.sleep(HEARTBEAT_INTERVAL)
-        print(f"{TAG} Woke up!")
 
 
 '''async def _stale_peer_cleanup_loop(node: Node):
