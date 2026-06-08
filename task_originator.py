@@ -36,8 +36,8 @@ async def run_negotiation(node, task_req: Message) -> dict:
                 if task_req.payload["task_type"] != "PRIVATE_TASK":
                     ack_msg = await node.bus.global_request((lan, node_id, ip), task_req)
                 else:
-                    await node.bus.local_request((lan, node_id, ip), task_req)
-                    ack_msg = await node.bus.get_message()
+                    ack_msg = await node.bus.local_request((lan, node_id, ip), task_req)
+                    #ack_msg = await node.bus.get_message()
                 if ack_msg and ack_msg.payload.get("msg") == "ack":
                     sent.append(node_id)
                     print(f"{TAG} TASK_REQUEST acked by {node_id}")

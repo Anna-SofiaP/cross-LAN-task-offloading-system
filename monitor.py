@@ -34,7 +34,6 @@ async def _heartbeat_loop(node: Node):
             )
         except Exception as e:
             print(f"{TAG} Heartbeat error: {e}")
-        #await asyncio.sleep(node.bus.heartbeat_interval)   #TODO: Figure out: why would this have to be in the messagebus?
         await asyncio.sleep(HEARTBEAT_INTERVAL)
 
 

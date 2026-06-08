@@ -77,6 +77,8 @@ class MessageBus:
 
         # ZeroMQ
         self.ctx = zmq.Context()
+        self.req_sock = None
+        self.rep_sock = None
 
     
     # ==================================================================
@@ -127,7 +129,7 @@ class MessageBus:
         lan, topic, ip = to
         print(f"{TAG} Sending request to node {topic} in LAN {lan}")
         print(f"{TAG} Using ZeroMQ for local request")
-        await self._send_zmq(ip, msg)
+        return await self._send_zmq(ip, msg)
 
 
     async def publish_heartbeat(self, lan: str):
@@ -141,8 +143,9 @@ class MessageBus:
         }).encode())
 
 
+    '''
     async def get_local_message(self) -> Message:
-        return await self._get_zmq_message(self)
+        return await self._get_zmq_message(self)'''
 
 
     # ==================================================================
@@ -152,7 +155,7 @@ class MessageBus:
     async def connect(self):
         """Connect to NATS server and bind to ZMQ port."""
         await self._connect_nats()
-        #await self._connect_to_zmq_sockets()
+        await self._connect_to_zmq_sockets()
 
         print(f"{TAG} Node {self.node_id} connected. Local IP: {self.local_ip}")
 
@@ -190,10 +193,11 @@ class MessageBus:
         #self.pull_sock.bind(f"tcp://0.0.0.0:{self.ZMQ_PORT}")
 
         # REQ-REP sockets
-        print(f"{TAG} Setting up ZeroMQ REQ socket for outgoing requests...")
-
         print(f"{TAG} Setting up ZeroMQ REP socket for incoming requests...")
+        self.rep_sock = self.ctx.socket(zmq.REP)
+        self.rep_sock.bind(f"tcp://0.0.0.0:{self.ZMQ_PORT}")
 
+        asyncio.create_task(self._zmq_listen_loop())
 
 
     # ==================================================================
@@ -322,7 +326,7 @@ class MessageBus:
         return self._zmq_dealers[node_id]'''
 
     
-    async def _send_zmq(self, ip: str, msg: Message):
+    async def _send_zmq(self, ip: str, msg: Message) -> Message:
         """Send a message through the ZMQ request socket."""
         try:
             req_sock = self.ctx.socket(zmq.REQ)
@@ -330,20 +334,45 @@ class MessageBus:
             req_sock.setsockopt(zmq.LINGER, 0)
             req_sock.connect(f"tcp://{ip}:{self.ZMQ_PORT}")
 
-            req = json.dumps(dict(type=msg.type,
-                                  originator_node=msg.originator_node, 
-                                  originator_lan=msg.originator_lan),
-                                  task_id=msg.payload.get("task_id"), 
-                                  task_type=msg.payload.get("task_type")).encode()
+            req = json.dumps({
+                "type": msg.type,
+                "originator_node": msg.originator_node,
+                "originator_lan": msg.originator_lan,
+                "payload": msg.payload
+            })
 
-            req_sock.send_string(req)
-            req_sock.close()
+            await req_sock.send_string(req)
+            ack = await req_sock.recv_string()  # waits for REP to reply
+            msg = json.loads(ack)
+            msg = Message(**msg)
+            return msg
 
             # BUG: change originator_node and originator_lan in the reply to be the actual sender's info instead of just echoing the request's originator info
             #return Message("ack", self.node_id, self.lan, payload=json.loads(ack.get("payload", "{}")))
         except Exception as e:
             print(f"{TAG} Sending message via ZMQ to {ip} failed: {e}")
             raise
+        finally:
+            req_sock.close()
+
+
+    async def _zmq_listen_loop(self):
+        """Runs as a background task — receives, dispatches, replies."""
+        while True:
+            try:
+                raw = await self.rep_sock.recv_string()
+                data = json.loads(raw)
+                msg = Message(**data)
+
+                # Dispatch to registered handler and get reply
+                reply = self._dispatch(msg)
+
+                await self.rep_sock.send_string(json.dumps(reply))
+
+            except Exception as e:
+                print(f"{TAG} ZMQ listen loop error: {e}")
+                await self.rep_sock.send_string(json.dumps({"msg": "error"}))
+                # always send something back or the REQ side hangs
 
 
     '''
@@ -368,23 +397,18 @@ class MessageBus:
             print(f"{TAG} ZMQ request to {ip} failed: {e}")
             raise'''
     
-
+    '''
     async def _get_zmq_message(self, msg) -> Message:
         try:
-            rep_sock = self.ctx.socket(zmq.REP)
-            rep_sock.bind(f"tcp://0.0.0.0:{self.ZMQ_PORT}")
-
-            msg = json.loads(rep_sock.recv_string())
-            if msg:
-                msg = Message(json.loads(msg))
-                print(f"{TAG} Received ZMQ message of type {msg.type} from {msg.originator_node}")
-                return msg
-            # TODO: handle situation msg == None
+            raw = await self.rep_sock.recv_string()
+            msg = json.loads(raw)
+            msg = Message(**msg)
+            print(f"{TAG} Received ZMQ message of type {msg.type} from {msg.originator_node}")
+            return msg
         except Exception as e:
             # TODO: handle error situation
             print(f"{TAG} Error handling ZMQ message: {e}")
-        finally:
-            rep_sock.close()
+            return None'''
 
 
     '''

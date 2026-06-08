@@ -50,7 +50,7 @@ class Node:
         await asyncio.gather(
             monitor.start(self),
             task_originator.start(self),
-            agent.start(self)
+            #agent.start(self)
         )
 
 

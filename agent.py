@@ -18,8 +18,10 @@ class Message:
 
 async def start(node):
     while True:
-        asyncio.sleep(10)
         msg = await node.bus.get_local_message()
+        if msg == None:
+            print(f"{TAG} No bid received from local peer.")
+            continue
         task_id = msg.payload.get("task_id")
         task_type = msg.payload.get("task_type")
 
