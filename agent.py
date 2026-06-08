@@ -1,3 +1,4 @@
+import asyncio
 from dataclasses import dataclass
 
 
@@ -9,6 +10,28 @@ class Message:
     originator_node: str
     originator_lan: str
     payload: dict
+
+
+# ==================================================================================
+# Local messaging (ZeroMQ) server
+# ==================================================================================
+
+async def start(node):
+    while True:
+        asyncio.sleep(10)
+        msg = await node.bus.get_local_message()
+        task_id = msg.payload.get("task_id")
+        task_type = msg.payload.get("task_type")
+
+        if task_type == "task_request":
+            print(f"\n{TAG} Received task request: task id={task_id}, type={task_type}")
+            await node.bus.local_request({"msg": "ack"})
+
+
+# ===================================================================================
+# NATS message handlers
+# ===================================================================================
+
 
 def register(node):
     """Register agent's message handlers to the node's MessageBus."""

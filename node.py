@@ -50,6 +50,7 @@ class Node:
         await asyncio.gather(
             monitor.start(self),
             task_originator.start(self),
+            agent.start(self)
         )
 
 
@@ -88,7 +89,7 @@ if __name__ == "__main__":
                 nats_url = config["nats-url"])
 
     try:
-        agent.register(node)    # Register message handlers
+        agent.register(node)    # Register message handlers for NATS communication
         asyncio.run(node.start())
     except KeyboardInterrupt:
         print(f"\n{TAG} Node {config["nid"]} shutting down.")

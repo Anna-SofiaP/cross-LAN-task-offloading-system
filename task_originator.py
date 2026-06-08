@@ -7,8 +7,9 @@ from time import time
 import uuid
 
 
-TASK_TYPES          = ["CLASSIFICATION", "CV_INFERENCE", "TIMESERIES"]
+TASK_TYPES          = ["CLASSIFICATION", "TIMESERIES", "PRIVATE_TASK"]
 TAG                 = "[ORIG]"
+BID_TIMEOUT         = 160
 
 @dataclass
 class Message:
@@ -23,27 +24,32 @@ async def run_negotiation(node, task_req: Message) -> dict:
 
     #broadcast_start = time()   # T1: first TASK_REQUEST sent
     sent = []
+    bids = []
 
     for lan, node_id, ip in node.peers:
         print(f"{TAG} Sending task request to peer {node_id}...")
-
+    
+        ack_msg = None
         acked = False
         for attempt in range(1, 4):
             try:
-                ack_msg = await node.bus.request((lan, node_id, ip), task_req)
+                if task_req.payload["task_type"] != "PRIVATE_TASK":
+                    ack_msg = await node.bus.global_request((lan, node_id, ip), task_req)
+                else:
+                    await node.bus.local_request((lan, node_id, ip), task_req)
+                    ack_msg = await node.bus.get_message()
                 if ack_msg and ack_msg.payload.get("msg") == "ack":
                     sent.append(node_id)
                     print(f"{TAG} TASK_REQUEST acked by {node_id}")
                     acked = True
                     break
-                break
             except Exception as e:
                 print(f"{TAG} {node_id} attempt {attempt}/3: {e}")
                 if attempt < 3:
                     await asyncio.sleep(2)
         if not acked:
             print(f"{TAG} Could not reach {node_id} after 3 attempts -- skipping")
-
+    
     if not sent:
         print(f"{TAG} No nodes acknowledged -- skipping")
         return None

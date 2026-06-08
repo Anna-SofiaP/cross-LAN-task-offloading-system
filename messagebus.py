@@ -101,19 +101,33 @@ class MessageBus:
         else:
             await self._pub_nats(to, msg)'''
 
-    
+    '''
     async def request(self, to: tuple, msg: Message, timeout: float = 3.0) -> Message:
         """Send a message and wait for a reply. Transport chosen automatically."""
 
         lan, topic, ip = to
         print(f"{TAG} Sending request to node {topic} in LAN {lan}")
 
-        if self._is_local(lan) and ip is not None:
+        if self._is_local(lan) and ip is not None or msg.payload["task_type"] == "PRIVATE_TASK":
             print(f"{TAG} Using ZeroMQ for local request")
-            #return await self._request_zmq(ip, msg, timeout)
+            await self._send_zmq(ip, msg, timeout)
         else:
             print(f"{TAG} Using NATS for remote request")
-            return await self._request_nats(topic, msg, timeout)
+            result = await self._request_nats(topic, msg, timeout)'''
+    
+
+    async def global_request(self, to: tuple, msg: Message, timeout: float = 3.0) -> Message:
+        lan, topic, ip = to
+        print(f"{TAG} Sending request to node {topic} in LAN {lan}")
+        print(f"{TAG} Using NATS for both remote and local request")
+        return await self._request_nats(topic, msg, timeout)
+    
+
+    async def local_request(self, to: tuple, msg: Message):
+        lan, topic, ip = to
+        print(f"{TAG} Sending request to node {topic} in LAN {lan}")
+        print(f"{TAG} Using ZeroMQ for local request")
+        await self._send_zmq(ip, msg)
 
 
     async def publish_heartbeat(self, lan: str):
@@ -127,6 +141,10 @@ class MessageBus:
         }).encode())
 
 
+    async def get_local_message(self) -> Message:
+        return await self._get_zmq_message(self)
+
+
     # ==================================================================
     # CONNECTTION MANAGEMENT
     # ===============================================================
@@ -134,7 +152,7 @@ class MessageBus:
     async def connect(self):
         """Connect to NATS server and bind to ZMQ port."""
         await self._connect_nats()
-        await self._connect_to_zmq_sockets()
+        #await self._connect_to_zmq_sockets()
 
         print(f"{TAG} Node {self.node_id} connected. Local IP: {self.local_ip}")
 
@@ -173,20 +191,8 @@ class MessageBus:
 
         # REQ-REP sockets
         print(f"{TAG} Setting up ZeroMQ REQ socket for outgoing requests...")
-        self.req_sock = self.ctx.socket(zmq.REQ)
-        self.req_sock.setsockopt(zmq.RCVTIMEO, 5000)
-        self.req_sock.setsockopt(zmq.LINGER, 0)
 
         print(f"{TAG} Setting up ZeroMQ REP socket for incoming requests...")
-        self.rep_sock = self.ctx.socket(zmq.REP)
-        self.rep_sock.bind(f"tcp://0.0.0.0:{self.ZMQ_PORT}")
-
-        print(f"{TAG} ZeroMQ REQ socket bound on port {self.ZMQ_PORT}\n")
-
-        while True:
-            msg = json.loads(self.rep_sock.recv_string())
-            if msg:
-                await self._reply_zmq(msg)
 
 
 
@@ -315,16 +321,32 @@ class MessageBus:
             print(f"{TAG} ZMQ DEALER connected to {node_id} @ {peer_ip}:{self.ZMQ_PORT}")
         return self._zmq_dealers[node_id]'''
 
-    '''
-    async def _send_zmq(self, to: str, msg: Message):
-        #try:
-        #    sock = self._get_zmq_dealer(to)
-        #    payload = json.dumps({**asdict(msg), "reply_to": None}).encode()
-        #    await sock.send_multipart([b"", payload])
-        #except Exception as e:
-        #    print(f"{TAG} ZMQ send to {to} failed: {e}")'''
-
     
+    async def _send_zmq(self, ip: str, msg: Message):
+        """Send a message through the ZMQ request socket."""
+        try:
+            req_sock = self.ctx.socket(zmq.REQ)
+            req_sock.setsockopt(zmq.RCVTIMEO, 5000)
+            req_sock.setsockopt(zmq.LINGER, 0)
+            req_sock.connect(f"tcp://{ip}:{self.ZMQ_PORT}")
+
+            req = json.dumps(dict(type=msg.type,
+                                  originator_node=msg.originator_node, 
+                                  originator_lan=msg.originator_lan),
+                                  task_id=msg.payload.get("task_id"), 
+                                  task_type=msg.payload.get("task_type")).encode()
+
+            req_sock.send_string(req)
+            req_sock.close()
+
+            # BUG: change originator_node and originator_lan in the reply to be the actual sender's info instead of just echoing the request's originator info
+            #return Message("ack", self.node_id, self.lan, payload=json.loads(ack.get("payload", "{}")))
+        except Exception as e:
+            print(f"{TAG} Sending message via ZMQ to {ip} failed: {e}")
+            raise
+
+
+    '''
     async def _request_zmq(self, ip: str, msg: Message, timeout: float) -> Optional[Message]:
         try:
             self.req_sock.connect(f"tcp://{ip}:{self.ZMQ_PORT}")
@@ -344,18 +366,25 @@ class MessageBus:
             return Message("ack", self.node_id, self.lan, payload=json.loads(ack.get("payload", "{}")))
         except Exception as e:
             print(f"{TAG} ZMQ request to {ip} failed: {e}")
-            raise
+            raise'''
     
 
-    async def _reply_zmq(self, msg):
+    async def _get_zmq_message(self, msg) -> Message:
         try:
-            # TODO: change what is being sent back to the sender.
-            print(f"{TAG} Received ZMQ message of type {msg.get('type')} from {msg.get('originator_node')}")
-            response = await self._dispatch(msg)
-            if response is not None:
-                self.rep_sock.send_string(json.dumps(response).encode())
+            rep_sock = self.ctx.socket(zmq.REP)
+            rep_sock.bind(f"tcp://0.0.0.0:{self.ZMQ_PORT}")
+
+            msg = json.loads(rep_sock.recv_string())
+            if msg:
+                msg = Message(json.loads(msg))
+                print(f"{TAG} Received ZMQ message of type {msg.type} from {msg.originator_node}")
+                return msg
+            # TODO: handle situation msg == None
         except Exception as e:
+            # TODO: handle error situation
             print(f"{TAG} Error handling ZMQ message: {e}")
+        finally:
+            rep_sock.close()
 
 
     '''
