@@ -18,7 +18,7 @@ import nats
 from dataclasses import dataclass, asdict
 from typing import Callable, Optional
 
-TAG = "[MessageBus]"
+TAG = "[BUS]"
 TOPIC_HEARTBEAT = "heartbeat"
 TOPIC_TASK_REQUEST = "task_request"
 BID_TIMEOUT = 90.0
@@ -76,7 +76,7 @@ class MessageBus:
         self.nc = None
 
         # ZeroMQ
-        self.ctx = zmq.Context()
+        self.ctx = zmq.asyncio.Context()
         self.req_sock = None
         self.rep_sock = None
 
@@ -134,7 +134,9 @@ class MessageBus:
 
     async def publish_heartbeat(self, lan: str):
         """Broadcast a heartbeat to the whole cluster via NATS."""
+        print(f"{TAG} Publishing heartbeat signal...")
         if self.nc is None:
+            print(f"{TAG} NATS client issue.")
             return
         await self.nc.publish(TOPIC_HEARTBEAT, json.dumps({
             "node_id": self.node_id,
@@ -155,7 +157,13 @@ class MessageBus:
     async def connect(self):
         """Connect to NATS server and bind to ZMQ port."""
         await self._connect_nats()
-        await self._connect_to_zmq_sockets()
+        #await self._connect_to_zmq_sockets()
+
+        print(f"{TAG} Setting up ZeroMQ REP socket for incoming requests...")
+        self.rep_sock = self.ctx.socket(zmq.REP)
+        self.rep_sock.bind(f"tcp://0.0.0.0:{self.ZMQ_PORT}")
+
+        #asyncio.create_task(self._zmq_listen_loop())
 
         print(f"{TAG} Node {self.node_id} connected. Local IP: {self.local_ip}")
 
@@ -193,11 +201,6 @@ class MessageBus:
         #self.pull_sock.bind(f"tcp://0.0.0.0:{self.ZMQ_PORT}")
 
         # REQ-REP sockets
-        print(f"{TAG} Setting up ZeroMQ REP socket for incoming requests...")
-        self.rep_sock = self.ctx.socket(zmq.REP)
-        self.rep_sock.bind(f"tcp://0.0.0.0:{self.ZMQ_PORT}")
-
-        asyncio.create_task(self._zmq_listen_loop())
 
 
     # ==================================================================
@@ -289,6 +292,9 @@ class MessageBus:
             node_id = data["node_id"]
             if node_id == self.node_id:
                 return  # ignore own heartbeat
+            
+            print(f"{TAG} Received a heartbeat signal from a peer!")
+            
             self._update_peer(node_id, data["lan"], data["ip"])
         except Exception as e:
             print(f"{TAG} Error handling heartbeat: {e}")
@@ -358,6 +364,7 @@ class MessageBus:
 
     async def _zmq_listen_loop(self):
         """Runs as a background task — receives, dispatches, replies."""
+        print(f"{TAG} Starting ZeroMQ loop for receiving messages from peers...")
         while True:
             try:
                 raw = await self.rep_sock.recv_string()
@@ -365,7 +372,7 @@ class MessageBus:
                 msg = Message(**data)
 
                 # Dispatch to registered handler and get reply
-                reply = self._dispatch(msg)
+                reply = await self._dispatch(msg)
 
                 await self.rep_sock.send_string(json.dumps(reply))
 
