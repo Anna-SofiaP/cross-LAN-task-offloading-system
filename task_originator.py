@@ -6,7 +6,7 @@ from random import random
 from time import time
 import uuid
 
-
+# TODO: modify task types and Message class so that PRIVATE_TASK is not a task type, but extra info about the task and task type.
 TASK_TYPES          = ["CLASSIFICATION", "TIMESERIES", "PRIVATE_TASK"]
 TAG                 = "[ORIG]"
 BID_TIMEOUT         = 160
@@ -42,7 +42,6 @@ async def run_negotiation(node, task_req: Message) -> dict:
                         break
 
                     ack_msg = await node.bus.local_request((lan, node_id, ip), task_req)
-                    #ack_msg = await node.bus.get_message()
 
                 if ack_msg and ack_msg.type == "ack":
                     sent.append(node_id)
@@ -61,7 +60,7 @@ async def run_negotiation(node, task_req: Message) -> dict:
         print(f"{TAG} No nodes acknowledged -- skipping\n")
         return None
 
-    return {"results": "Negotiation results (placeholder)"}
+    return {"results": "(placeholder)"}
 
 
 
@@ -70,9 +69,9 @@ async def start(node):
     task_cycle = itertools.cycle(TASK_TYPES)    # NOTE: just for now, for testing.
 
     while True:
-        await asyncio.sleep(10)  # Simulate delay
+        await asyncio.sleep(10)  # NOTE: Simulate delay, remove later
 
-        # For testing, we just create random tasks
+        # NOTE: For testing, we just create random tasks
         task_id = str(uuid.uuid4())[:8]
         task_type = next(task_cycle)
 
@@ -91,5 +90,4 @@ async def start(node):
         )
 
         negotiation_results = await run_negotiation(node, task_req)
-        #negotiation_results = {"results": "Negotiation results (placeholder)"}
-        print(f"{TAG} Negotiation results: {negotiation_results}")
+        print(f"{TAG} Negotiation results: {negotiation_results["results"]}")
