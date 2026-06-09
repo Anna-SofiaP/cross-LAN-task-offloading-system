@@ -37,7 +37,7 @@ class Message:
     type: str
     originator_node: str
     originator_lan: str
-    payload: dict
+    payload: dict = None
 
 
 def get_local_ip() -> str:
@@ -118,14 +118,16 @@ class MessageBus:
             result = await self._request_nats(topic, msg, timeout)'''
     
 
+    # TODO: merge global_request and local_request to one request function? And do decision about messaging there!
     async def global_request(self, to: tuple, msg: Message, timeout: float = 3.0) -> Message:
         lan, topic, ip = to
         print(f"{TAG} Sending request to node {topic} in LAN {lan}\n")
         return await self._request_nats(topic, msg, timeout)
     
-
     async def local_request(self, to: tuple, msg: Message) -> Message:
         lan, topic, ip = to
+        if not ip:
+            return
         print(f"{TAG} Sending request to node {topic} in LAN {lan}\n")
         return await self._send_zmq(ip, msg)
 
@@ -208,7 +210,7 @@ class MessageBus:
         return lan is not None and self.lan == lan
 
 
-    def _update_peer(self, node_id: str, lan: str, ip: str):
+    async def _update_peer(self, node_id: str, lan: str, ip: str):
         """Add a new peer to the registry or update an existing one. 
         If it is a new peer, call the registered callbacks.
         
@@ -227,7 +229,7 @@ class MessageBus:
             transport = "ZeroMQ (direct)" if lan == self.lan else "NATS (via broker)"
             print(f"{TAG} New peer discovered: {node_id} @ {ip} — transport: {transport}\n")
             for cb in self._peer_callbacks:
-                cb(node_id, self.peers[node_id])
+                await cb(node_id, self.peers[node_id])
 
     # TODO: make work!
     '''def get_available_peers(self) -> list[str]:
@@ -271,7 +273,7 @@ class MessageBus:
         """Dispatch an incoming NATS direct message to the registered handler."""
         try:
             msg = Message(**json.loads(raw_msg.data.decode()))
-            print(f"{TAG} Received NATS message of type {msg.type} from {raw_msg.subject}\n")
+            print(f"{TAG} Received NATS message of type {msg.type} from {msg.originator_node}\n")
             response = await self._dispatch(msg)
             if raw_msg.reply and response is not None:
                 await self.nc.publish(raw_msg.reply, json.dumps(response).encode())
@@ -289,7 +291,7 @@ class MessageBus:
             
             print(f"{TAG} Received a heartbeat signal from a peer!\n")
             
-            self._update_peer(node_id, data["lan"], data["ip"])
+            await self._update_peer(node_id, data["lan"], data["ip"])
         except Exception as e:
             print(f"{TAG} Error handling heartbeat: {e}")
 
@@ -331,6 +333,7 @@ class MessageBus:
     
     async def _send_zmq(self, ip: str, msg: Message) -> Message:
         """Send a message through the ZMQ request socket."""
+        print(f"{TAG} Sending ZMQ message to {ip}...")
         try:
             req_sock = self.ctx.socket(zmq.REQ)
             req_sock.setsockopt(zmq.RCVTIMEO, 5000)
@@ -346,12 +349,9 @@ class MessageBus:
 
             await req_sock.send_string(req)
             ack = await req_sock.recv_string()  # waits for REP to reply
-            msg = json.loads(ack)
-            msg = Message(**msg)
-            return msg
-
-            # BUG: change originator_node and originator_lan in the reply to be the actual sender's info instead of just echoing the request's originator info
-            #return Message("ack", self.node_id, self.lan, payload=json.loads(ack.get("payload", "{}")))
+            response = json.loads(ack)
+            #msg = Message(msg.type, msg.originator_lan, msg.originator_node, msg.payload)
+            return response
         except Exception as e:
             print(f"{TAG} Sending message via ZMQ to {ip} failed: {e}")
             raise
@@ -444,14 +444,15 @@ class MessageBus:
                 await asyncio.sleep(0.1)'''
 
     
-    async def _dispatch(self, msg: Message):
+    async def _dispatch(self, msg: Message) -> Message:
         print(f"{TAG} Dispatching message of type {msg.type} to handler...\n")
         handler = self._handlers.get(msg.type)
         if handler:
             result = handler(msg.payload)
             if asyncio.iscoroutine(result):
                 result = await result
-            return result
+            response = Message(type=result["msg"], originator_node=self.node_id, originator_lan=self.lan)
+            return response
         else:
             print(f"{TAG} No handler for message type: {msg.type}\n")
             return None
