@@ -51,12 +51,12 @@ class Node:
             #monitor.start(self),
             monitor.heartbeat_loop(self),
             task_originator.start(self),
-            self.bus._zmq_listen_loop()
+            #self.bus._zmq_listen_loop()
             #agent.start(self)
         )
 
 
-    def _on_peer_update(self, node_id: str, info: dict):
+    async def _on_peer_update(self, node_id: str, info: dict):
         transport = "ZeroMQ (direct)" if info.get("local") else "NATS (via broker)"
         print(f"{TAG} Peer joined:" \
                 f"   Node ID: {node_id}" \
