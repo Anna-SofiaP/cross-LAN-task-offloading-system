@@ -11,9 +11,12 @@ Run this file directly to start a node:
     python node.py
 """
 
+from collections import deque
+
 import task_originator
 import monitor
 import asyncio
+import tensorflow as tf
 #import argparse
 from messagebus import MessageBus
 import agent
@@ -21,14 +24,32 @@ import yaml
 
 TAG = "[Node]"
 CONFIG_FILE= "node_config.yaml"
+HORIZON_H = 5
+
+
+# TODO: download lstm, put to good dir and change these paths!!!
 
 
 class Node:
-    def __init__(self, node_id: str, lan: str, nats_url: str):
-        # Identity and state
+    def __init__(self, node_id: str, lan: str, nats_url: str, lstm_model_path: str, llm_model_path: str):
         self.id = node_id
         self.lan = lan
         self.peers = []  # tuple: ("lan": str, "node_id": node_id, "ip": str|None)
+
+        print(f"{TAG} Loading LSTM ...")
+        # TODO: install tf (tensorflow?)
+        self.lstm_model = tf.keras.models.load_model(lstm_model_path)
+        self.window_len = self.lstm_model.input_shape[1]
+        print(f"{TAG} LSTM ready  window={self.window_len}")
+
+        self.resource_history = deque(maxlen=self.window_len)
+        self.state = dict(score=0.5, risk="MEDIUM",
+                   reputation=0.5, reliability=0.6, cpu=0.0, mem=0.0, disk=0.0,
+                   cpu_pred=0.5, mem_pred=0.5, disk_pred=0.5, lstm_ready=False,
+                   horizon=[[0.5,0.5,0.5]]*HORIZON_H, is_busy=False,
+                   tasks_completed=0)
+        
+        self.task_cache = []
 
         # Communication layer
         self.bus = MessageBus(node_id=node_id, nats_url=nats_url, lan=lan)
@@ -48,11 +69,13 @@ class Node:
 
         # Start background loops concurrently
         await asyncio.gather(
-            #monitor.start(self),
+            # Monitoring loops
             monitor.heartbeat_loop(self),
-            task_originator.start(self),
+            monitor.metric_loop(self),
+            # Task originator loop
+            #task_originator.start(self),
+            # ZMQ loop
             #self.bus._zmq_listen_loop()
-            #agent.start(self)
         )
 
 
@@ -87,7 +110,9 @@ if __name__ == "__main__":
 #    node = Node(node_id=args.id, nats_url=args.nats)
     node = Node(node_id = config["nid"], 
                 lan = config["lan"], 
-                nats_url = config["nats-url"])
+                nats_url = config["nats-url"],
+                lstm_model_path = config["lstm-model"],
+                llm_model_path = config["llm-model"])
 
     try:
         #agent.register(node)    # Register message handlers for NATS communication
