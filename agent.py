@@ -51,7 +51,7 @@ def handle_task_request(task_req: dict) -> dict:
           "     type={task_type}\n")
 
     # TODO: send back also originator_node id and originator_lan in the reply
-    return {"msg": "ack" }
+    return {"msg": "ack"}
 
 
 def handle_task_assignment(task_assignment: Message):
