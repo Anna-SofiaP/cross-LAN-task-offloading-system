@@ -44,7 +44,7 @@ async def run_negotiation(node, task_req: Message) -> dict:
                     ack_msg = await node.bus.local_request((lan, node_id, ip), task_req)
                     #ack_msg = await node.bus.get_message()
 
-                if ack_msg and ack_msg.payload.get("msg") == "ack":
+                if ack_msg and ack_msg.type == "ack":
                     sent.append(node_id)
                     print(f"{TAG} TASK_REQUEST acked by {node_id}\n")
                     acked = True
@@ -53,7 +53,7 @@ async def run_negotiation(node, task_req: Message) -> dict:
                 print(f"{TAG} {node_id} attempt {attempt}/3: {e}\n")
                 if attempt < 3:
                     await asyncio.sleep(3)
-                    
+
         if not acked:
             print(f"{TAG} Could not reach {node_id} after 3 attempts -- skipping")
     

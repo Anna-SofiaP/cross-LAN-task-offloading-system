@@ -276,7 +276,7 @@ class MessageBus:
             print(f"{TAG} Received NATS message of type {msg.type} from {msg.originator_node}\n")
             response = await self._dispatch(msg)
             if raw_msg.reply and response is not None:
-                await self.nc.publish(raw_msg.reply, json.dumps(response).encode())
+                await self.nc.publish(raw_msg.reply, json.dumps(asdict(response)).encode())
         except Exception as e:
             print(f"{TAG} Error handling NATS message: {e}")
             
@@ -350,6 +350,7 @@ class MessageBus:
             await req_sock.send_string(req)
             ack = await req_sock.recv_string()  # waits for REP to reply
             response = json.loads(ack)
+            response = Message(**response)
             #msg = Message(msg.type, msg.originator_lan, msg.originator_node, msg.payload)
             return response
         except Exception as e:
@@ -371,7 +372,7 @@ class MessageBus:
                 # Dispatch to registered handler and get reply
                 reply = await self._dispatch(msg)
 
-                await self.rep_sock.send_string(json.dumps(reply))
+                await self.rep_sock.send_string(json.dumps(asdict(reply)))
 
             except Exception as e:
                 print(f"{TAG} ZMQ listen loop error: {e}")
