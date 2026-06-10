@@ -12,7 +12,8 @@ Run this file directly to start a node:
 """
 
 from collections import deque
-
+import torch
+from transformers import AutoTokenizer, AutoModelForCausalLM
 import task_originator
 import monitor
 import asyncio
@@ -51,8 +52,16 @@ class Node:
         
         self.task_cache = []
 
+        print(f"{TAG} Loading LLM ...")
+        self.llm_tok = AutoTokenizer.from_pretrained(llm_model_path, local_files_only=True)
+        self.llm_mdl = AutoModelForCausalLM.from_pretrained(
+            llm_model_path, dtype=torch.float16, device_map="cpu", local_files_only=True)
+        self.llm_mdl.eval()
+        print(f"{TAG} LLM ready")
+
         # Communication layer
-        self.bus = MessageBus(node_id=node_id, nats_url=nats_url, lan=lan)
+        #self.bus = MessageBus(node_id=node_id, nats_url=nats_url, lan=lan)
+        self.bus = MessageBus(node, nats_url)
 
         # Callbacks and handlers
         self.bus.on_peer_update(self._on_peer_update)
@@ -73,19 +82,18 @@ class Node:
             monitor.heartbeat_loop(self),
             monitor.metric_loop(self),
             # Task originator loop
-            #task_originator.start(self),
+            task_originator.start(self),
             # ZMQ loop
             #self.bus._zmq_listen_loop()
         )
 
 
     async def _on_peer_update(self, node_id: str, info: dict):
-        transport = "ZeroMQ (direct)" if info.get("local") else "NATS (via broker)"
+        #transport = "ZeroMQ (direct)" if info.get("local") else "NATS (via broker)"
         print(f"{TAG} Peer joined:" \
                 f"   Node ID: {node_id}" \
                 f"   LAN: {info['lan']}" \
-                f"   IP: {info['ip']}" \
-                f"   via: {transport}")
+                f"   IP: {info['ip']}")
         
 
         # If the peer is on the same LAN, add also IP address info for direct communication
