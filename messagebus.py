@@ -58,16 +58,19 @@ def get_local_ip() -> str:
 class MessageBus:
     ZMQ_PORT = 5555
 
-    def __init__(self, node_id: str, nats_url: str, lan: str, heartbeat_interval=30):
-        self.node_id = node_id
+    #def __init__(self, node_id: str, nats_url: str, lan: str, heartbeat_interval=30):
+    def __init__(self, node, nats_url, heartbeat_interval=30):
+        #self.node_id = node.id
+        #self.lan = node.lan
+        self.node = node                # The node object is passed to the messagebus
         self.nats_url = nats_url
-        self.lan = lan
+        self.peers = []
         self.local_ip = get_local_ip()
 
         self.heartbeat_interval = heartbeat_interval
 
         # Peer registry: node_id → {"ip": ..., "status": ..., "last_seen": ..., "local": bool}
-        self.peers: dict[str, dict] = {} #NOTE: Is this needed? Change to a list of tuples instead?
+        #self.peers: dict[str, dict] = {} #NOTE: Is this needed? Change to a list of tuples instead?
 
         self._handlers: dict[str, Callable] = {}
         self._peer_callbacks: list[Callable] = []
@@ -138,7 +141,7 @@ class MessageBus:
         if self.nc is None:
             return
         await self.nc.publish(TOPIC_HEARTBEAT, json.dumps({
-            "node_id": self.node_id,
+            "node_id": self.node.id,
             "lan": lan,
             "ip": self.local_ip,
         }).encode())
@@ -164,7 +167,7 @@ class MessageBus:
 
         #asyncio.create_task(self._zmq_listen_loop())
 
-        print(f"{TAG} Node {self.node_id} connected. Local IP: {self.local_ip}")
+        print(f"{TAG} Node {self.node.id} connected. Local IP: {self.local_ip}")
 
 
     async def _connect_nats(self):
@@ -179,11 +182,11 @@ class MessageBus:
         )
 
         # Subscribe to this node's direct subject
-        await self.nc.subscribe(f"nodes.{self.node_id}", cb=self._on_nats_message)
+        await self.nc.subscribe(f"nodes.{self.node.id}", cb=self._on_nats_message)
         # Subscribe to cluster-wide heartbeats
         await self.nc.subscribe(TOPIC_HEARTBEAT, cb=self._on_heartbeat)
 
-        print(f"\n{TAG} Subscribed to nodes.{self.node_id} and {TOPIC_HEARTBEAT}\n")
+        print(f"\n{TAG} Subscribed to nodes.{self.node.id} and {TOPIC_HEARTBEAT}\n")
 
 
     async def _connect_to_zmq_sockets(self):
@@ -207,7 +210,7 @@ class MessageBus:
 
     def _is_local(self, lan: str) -> bool:
         """Check if the node in question is on the same LAN (i.e. we have a direct ZMQ connection)"""
-        return lan is not None and self.lan == lan
+        return lan is not None and self.node.lan == lan
 
 
     async def _update_peer(self, node_id: str, lan: str, ip: str):
@@ -219,17 +222,19 @@ class MessageBus:
 
         #is_local = same_subnet(self.local_ip, ip)
         existed = node_id in self.peers
-        self.peers[node_id] = {
-            "ip": ip,
-            "lan": lan,
-            "last_seen": asyncio.get_event_loop().time(),
-        #    "local": is_local,
-        }
+        self.peers.append(node_id)
+        #self.node.peers[node_id] = {
+        #    "ip": ip,
+        #    "lan": lan,
+        #    "last_seen": asyncio.get_event_loop().time(),
+        ##    "local": is_local,
+        #}
         if not existed:
             transport = "ZeroMQ (direct)" if lan == self.lan else "NATS (via broker)"
             print(f"{TAG} New peer discovered: {node_id} @ {ip} — transport: {transport}\n")
             for cb in self._peer_callbacks:
-                await cb(node_id, self.peers[node_id])
+                #await cb(node_id, self.peers[node_id])
+                await cb(node_id, {"ip": ip, "lan": lan})
 
     # TODO: make work!
     '''def get_available_peers(self) -> list[str]:
@@ -239,13 +244,9 @@ class MessageBus:
 
     # ==================================================================
     # NATS transport
-    # _pub_nats() → publish a message to another node's subject (pub/sub)
-    # _request_nats() → send a message and wait for a reply (request/reply)
-    # _on_nats_message() → handle an incoming NATS message, dispatch to handler
-    # _on_heartbeat() → handle an incoming heartbeat, update peer registry
-    # _on_nats_reconnect() / _on_nats_disconnect() / _on_nats_error() → log connection status
+    # ==================================================================
 
-# TODO: make these work!
+    # TODO: make these work!
     '''async def _pub_nats(self, to: str, msg: Message):
         await self.nc.publish(f"nodes.{to}", json.dumps(asdict(msg)).encode())'''
 
@@ -258,10 +259,14 @@ class MessageBus:
                 json.dumps(asdict(msg)).encode(),
                 timeout=timeout,
             )
-            print(f"\n{TAG} Received NATS reply from {topic}: {reply.data.decode()}\n")
+
+            reply_data = reply.data.decode()
+            reply_JSON = json.loads(reply_data)
+
+            print(f"\n{TAG} Received NATS reply from {topic}: {reply_data}\n")
 
             # BUG: what should the originator_node and originator_lan be in the reply? Currently we just set them to the same as the request, but maybe they should be the topic's node_id and LAN?
-            response = Message("ack", self.node_id, self.lan, payload=json.loads(reply.data.decode()))
+            response = Message(**reply_JSON)
             return response
         except Exception as e:
             print(f"{TAG} NATS request to {topic} failed: {e}")
@@ -286,7 +291,7 @@ class MessageBus:
         try:
             data = json.loads(raw_msg.data)
             node_id = data["node_id"]
-            if node_id == self.node_id:
+            if node_id == self.node.id:
                 return  # ignore own heartbeat
             
             print(f"{TAG} Received a heartbeat signal from a peer!\n")
@@ -447,13 +452,21 @@ class MessageBus:
     
     async def _dispatch(self, msg: Message) -> Message:
         print(f"{TAG} Dispatching message of type {msg.type} to handler...\n")
+
         handler = self._handlers.get(msg.type)
+
         if handler:
-            result = handler(msg.payload)
+            result = handler(self.node, msg.payload)
+
             if asyncio.iscoroutine(result):
                 result = await result
-            response = Message(type=result["msg"], originator_node=self.node_id, originator_lan=self.lan)
+
+            response = Message(type=result["type"], 
+                               originator_node=self.node.id, 
+                               originator_lan=self.node.lan,
+                               payload=result["payload"])
             return response
+        
         else:
             print(f"{TAG} No handler for message type: {msg.type}\n")
             return None
