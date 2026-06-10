@@ -1,6 +1,9 @@
 import numpy as np
 
 HORIZON_H = 5
+LOAD_PENALTY = 0.05        # score penalty per task above average
+NEW_NODE_BONUS = 0.03      # bonus for nodes with 0 assignments
+
 
 # ---- LSTM prediction -----------------------------------------------------
 def predict_horizon(history, window_len, lstm_model):
@@ -49,3 +52,46 @@ def risk_level(score):
     if score >= 0.50: return "MEDIUM"
     if score >= 0.30: return "HIGH"
     return "CRITICAL"
+
+
+'''
+def load_balanced_score(node, peer_id, bid: dict, all_keys: list = None) -> float:
+    """
+    Adjusted score = raw - penalty + bonus
+
+    The critical fix: average is computed over ALL live nodes (including
+    those with zero assignments), not just those already in _assign_counts.
+    Without this, a node that always wins has avg == my_count == penalty 0.
+
+    Example with 2 nodes, Linux has 6 tasks, Windows has 0:
+      counts = {linux: 6, windows: 0}  (windows explicitly included)
+      avg    = (6+0)/2 = 3.0
+      linux  penalty = 0.05*(6-3) = 0.15  -> adj = 0.71-0.15 = 0.56
+      windows bonus  = 0.03              -> adj = 0.60+0.03 = 0.63
+      Windows wins this round.
+    """
+    #key = node.get("_key", node.get("ip", "?"))
+    raw = bid[f"{peer_id}"].get("score", 0.0)
+
+    #with _assign_lock: 
+    counts = dict(_assign_counts)
+
+    # Build full count map including live nodes with 0 assignments
+    #with _nodes_lock: 
+    #    live_keys = list(_live_nodes.keys())
+    if all_keys: 
+        live_keys = list(set(live_keys) | set(all_keys))
+
+    full_counts = {k: counts.get(k, 0) for k in live_keys}
+    if not full_counts:
+        return round(raw + NEW_NODE_BONUS, 4)
+
+    my  = full_counts.get(key, 0)
+    avg = sum(full_counts.values()) / max(len(full_counts), 1)
+
+    penalty = LOAD_PENALTY * max(0.0, my - avg)
+    bonus   = NEW_NODE_BONUS if my == 0 else 0.0
+    adj     = round(raw - penalty + bonus, 4)
+
+    return max(0.0, min(1.0, adj))
+'''
