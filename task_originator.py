@@ -5,6 +5,7 @@ import json
 from random import random
 from time import time
 import uuid
+from lstm_scoring import load_balanced_score
 
 # TODO: modify task types and Message class so that PRIVATE_TASK is not a task type, but extra info about the task and task type.
 TASK_TYPES          = ["CLASSIFICATION", "TIMESERIES", "PRIVATE_TASK"]
@@ -16,49 +17,107 @@ class Message:
     type: str
     originator_node: str
     originator_lan: str
-    payload: dict
+    payload: dict = None
 
 
-async def run_negotiation(node, task_req: Message) -> dict:
-    print(f"\n{TAG} Running negotiation for task {task_req.payload['task_id']}...")
-
-    #broadcast_start = time()   # T1: first TASK_REQUEST sent
+async def send_task_request(node, task_req) -> list:
     sent = []
-    bids = []
 
-    for lan, node_id, ip in node.peers:
-        print(f"{TAG} Sending task request to peer {node_id}...\n")
+    for lan, peer_id, ip in node.peers:
+        print(f"{TAG} Sending task request to peer {peer_id}...\n")
     
         ack_msg = None
         acked = False
         for attempt in range(1, 4):
             try:
                 if task_req.payload["task_type"] != "PRIVATE_TASK":
-                    ack_msg = await node.bus.global_request((lan, node_id, ip), task_req)
+                    ack_msg = await node.bus.global_request((lan, peer_id, ip), task_req)
 
                 elif task_req.payload["task_type"] == "PRIVATE_TASK":
                     if not ip:
                         print(f"{TAG} Skipping global node...")
                         break
 
-                    ack_msg = await node.bus.local_request((lan, node_id, ip), task_req)
+                    ack_msg = await node.bus.local_request((lan, peer_id, ip), task_req)
 
                 if ack_msg and ack_msg.type == "ack":
-                    sent.append(node_id)
-                    print(f"{TAG} TASK_REQUEST acked by {node_id}\n")
+                    sent.append(peer_id)
+                    print(f"{TAG} TASK_REQUEST acked by {peer_id}\n")
                     acked = True
                     break
             except Exception as e:
-                print(f"{TAG} {node_id} attempt {attempt}/3: {e}\n")
+                print(f"{TAG} {peer_id} attempt {attempt}/3: {e}\n")
                 if attempt < 3:
                     await asyncio.sleep(3)
 
         if not acked:
-            print(f"{TAG} Could not reach {node_id} after 3 attempts -- skipping")
+            print(f"{TAG} Could not reach {peer_id} after 3 attempts -- skipping")
     
+    return sent
+
+
+
+async def get_bids(node, bid_req: Message, sent_reqests: int):
+    print(f"{TAG} Asking for bids from peers, for task request {bid_req.payload['task_id']} ...")
+    bids = []
+
+    for lan, peer_id, ip in node.peers:
+        bid = None
+        try:
+            if bid_req.payload['task_type'] != "PRIVATE_TASK":
+                bid = await node.bus.global_request((lan, peer_id, ip), bid_req)
+
+            elif bid_req.payload["task_type"] == "PRIVATE_TASK":
+                if not ip:
+                    print(f"{TAG} Skipping global node...")
+                    break
+
+                bid = await node.bus.local_request((lan, peer_id, ip), bid_req)
+
+            # NOTE: Remember that only bids with decision ACCEPT are added to the bids list!!!
+            # TODO: Handle bid_reject and bid_accept???
+            if bid.type == "bid_accept" and bid.payload["task_id"] == bid_req.payload["task_id"]:
+                #bid["_key"] = f"{bid['node_ip']}:{bid['peer_id']}"
+                bid_info = {f"{peer_id}": bid.payload}
+                bids.append(bid_info)
+
+                # TODO: bid should be a Message, check format!
+        #        print(f"{TAG} Bid from {peer_id}  "
+        #              f"raw={bid.payload["score"]:.4f}  adj={load_balanced_score(node, peer_id, bid_info):.4f}")
+                
+                if len(bids) >= sent_reqests:
+                    print(f"{TAG} All nodes responded!")
+                    break
+                
+        except Exception as e: 
+            print(f"{TAG} Error in receiving bids:\n{e}")
+            continue
+
+    return bids
+
+
+
+async def run_negotiation(node, task_req: Message) -> dict:
+    print(f"\n{TAG} Running negotiation for task {task_req.payload['task_id']}...")
+
+    #broadcast_start = time()   # T1: first TASK_REQUEST sent
+    sent = await send_task_request(node, task_req)
+
     if not sent:
         print(f"{TAG} No nodes acknowledged -- skipping\n")
         return None
+
+    bid_req = Message(
+        type="bid_request",
+        originator_node=node.id,
+        originator_lan=node.lan,
+        payload={
+            "task_id": task_req.payload['task_id'],
+            "task_type": task_req.payload['task_type']
+        }
+    )   
+    
+    bids = await get_bids(node, bid_req, len(sent))
 
     return {"results": "(placeholder)"}
 
