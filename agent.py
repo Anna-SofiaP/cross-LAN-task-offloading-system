@@ -1,5 +1,7 @@
 import asyncio
 from dataclasses import dataclass
+import json
+from llm_decision import local_llm_decide
 
 
 TAG = "[Agent]"
@@ -9,25 +11,80 @@ class Message:
     type: str
     originator_node: str
     originator_lan: str
-    payload: dict
+    payload: dict = None
 
 
 def register(node):
     """Register agent's message handlers to the node's MessageBus."""
     node.bus.on("task_request", handle_task_request)
+    node.bus.on("bid_request", handle_bid_request)
     node.bus.on("task_assignment", handle_task_assignment)
 
 
-def handle_task_request(task_req: dict) -> dict:
+def handle_task_request(node, task_req: dict) -> dict:
     task_id = task_req.get("task_id")
     task_type = task_req.get("task_type")
 
     print(f"\n{TAG} Received task request: " +
-          "     task id={task_id}" +
-          "     type={task_type}\n")
+          f"     task id={task_id}" +
+          f"     type={task_type}\n")
 
-    return {"msg": "ack"}
+    return {"type": "ack", "payload": {}}
 
 
-def handle_task_assignment(task_assignment: Message):
+def handle_bid_request(node, bid_req: dict) -> dict:
+    task_id = bid_req.get("task_id")
+    task_type = bid_req.get("task_type")
+
+    print(f"\n{TAG} Received bid request: " +
+          f"     task id={task_id}" +
+          f"     type={task_type}\n")
+    
+    node_resource_state = node.state
+    
+    print(f"[{TAG}] Evaluating {task_id}  score={node_resource_state['score']:.4f} " \
+          f"risk={node_resource_state['risk']}  busy={node_resource_state.get('is_busy', False)}")
+    
+#    llm_decision = local_llm_decide(node_resource_state, node.id, node.llm_tok, node.llm_mdl, task_type)
+#
+#    print(f"{TAG} Decision: {llm_decision['decision']}  reason: {llm_decision['reason']}")
+#
+#    if llm_decision["decision"] != "ACCEPT":
+#        print(f"{TAG} Not bidding -- REJECT")
+#        return {"type": "bid_reject", "payload": {"task_id": task_id, "decision": "REJECT"}}
+    
+    # NOTE: useless stuff
+    #bid = dict(type="bid", 
+    #        task_id=task_id,
+    #        node_id=node.id,
+    #        score=node_resource_state["score"], 
+    #        risk=node_resource_state["risk"],
+    #        reason=llm_decision["reason"], 
+    #        decision="ACCEPT")
+    
+#    bid = {"type": "bid_accept",
+#           "payload": {
+#               "task_id": task_id,
+#               "node_id": node.id,
+#               "score": node_resource_state["score"],
+#               "risk": node_resource_state["risk"],
+#               "reason": llm_decision["reason"], 
+#               "decision": "ACCEPT"
+#            }
+#           }
+
+    print(f"{TAG} Sending bid with score={node_resource_state['score']:.4f}")
+
+    # NOTE: for testing
+    bid = {"type": "bid_accept",
+           "payload": {
+               "task_id": task_id,
+               "node_id": node.id
+            }
+    }
+
+    return bid
+
+
+def handle_task_assignment(node, task_assignment: Message):
     pass
