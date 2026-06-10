@@ -75,7 +75,7 @@ async def metric_loop(node: Node):
             cpu=round(cpu/100,4), mem=round(mem/100,4), disk=round(disk/100,4),
             cpu_pred=round(float(avg[0]),4), mem_pred=round(float(avg[1]),4),
             disk_pred=round(float(avg[2]),4), lstm_ready=ready,
-            horizon=preds.tolist(), is_busy=node.state["_is_busy"], # TODO: check that this prints correct info and works correctly
+            horizon=preds.tolist(), is_busy=node.state["is_busy"],
             tasks_completed=len(node.task_cache))
             
         st = "READY" if ready else f"warming {n}/{node.window_len}"
