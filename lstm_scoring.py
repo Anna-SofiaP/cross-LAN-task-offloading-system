@@ -55,7 +55,7 @@ def risk_level(score):
 
 
 '''
-def load_balanced_score(node, peer_id, bid: dict, all_keys: list = None) -> float:
+def load_balanced_score(node, bid: dict, all_bidders: list = None) -> float:
     """
     Adjusted score = raw - penalty + bonus
 
@@ -70,28 +70,30 @@ def load_balanced_score(node, peer_id, bid: dict, all_keys: list = None) -> floa
       windows bonus  = 0.03              -> adj = 0.60+0.03 = 0.63
       Windows wins this round.
     """
-    #key = node.get("_key", node.get("ip", "?"))
-    raw = bid[f"{peer_id}"].get("score", 0.0)
+    peer_id = bid.get("node_id")
+    raw = bid.get("score", 0.0)
 
     #with _assign_lock: 
-    counts = dict(_assign_counts)
+    task_assign_counts = dict(node.assigned_task_counts)
 
-    # Build full count map including live nodes with 0 assignments
-    #with _nodes_lock: 
-    #    live_keys = list(_live_nodes.keys())
-    if all_keys: 
-        live_keys = list(set(live_keys) | set(all_keys))
+    # Build a map of the task assignments counts for all live peers, including live nodes with 0 assignments
+    # Get the node_id value from the peer info tuple, for each peer in the peer list
+    live_peers = [peer[1] for peer in node.peers]   # BUG: the peer removing has not been implemented yet!
+    if all_bidders:
+        live_peers = list(set(live_peers) | set(all_bidders))
 
-    full_counts = {k: counts.get(k, 0) for k in live_keys}
-    if not full_counts:
+    # Get the task assignment counts of all peers. If there are no live peers...
+    all_task_assign_counts = {k: task_assign_counts.get(k, 0) for k in live_peers}
+    if not all_task_assign_counts:
         return round(raw + NEW_NODE_BONUS, 4)
 
-    my  = full_counts.get(key, 0)
-    avg = sum(full_counts.values()) / max(len(full_counts), 1)
+    # Get the task assignment counts of the currently examined peer.
+    peer_task_assign_counts = all_task_assign_counts.get(peer_id, 0)
 
-    penalty = LOAD_PENALTY * max(0.0, my - avg)
-    bonus   = NEW_NODE_BONUS if my == 0 else 0.0
+    avg = sum(all_task_assign_counts.values()) / max(len(all_task_assign_counts), 1)
+
+    penalty = LOAD_PENALTY * max(0.0, peer_task_assign_counts - avg)
+    bonus   = NEW_NODE_BONUS if peer_task_assign_counts == 0 else 0.0
     adj     = round(raw - penalty + bonus, 4)
 
-    return max(0.0, min(1.0, adj))
-'''
+    return max(0.0, min(1.0, adj))'''
