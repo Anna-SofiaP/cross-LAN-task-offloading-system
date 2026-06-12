@@ -51,7 +51,7 @@ def handle_bid_request(node, bid_req: dict) -> dict:
 #
 #    if llm_decision["decision"] != "ACCEPT":
 #        print(f"{TAG} Not bidding -- REJECT")
-#        return {"type": "bid_reject", "payload": {"task_id": task_id, "decision": "REJECT"}}
+#        return {"type": "bid", "payload": {"task_id": task_id, "decision": "REJECT"}}
     
     # NOTE: useless stuff
     #bid = dict(type="bid", 
@@ -62,7 +62,7 @@ def handle_bid_request(node, bid_req: dict) -> dict:
     #        reason=llm_decision["reason"], 
     #        decision="ACCEPT")
     
-#    bid = {"type": "bid_accept",
+#    bid = {"type": "bid",
 #           "payload": {
 #               "task_id": task_id,
 #               "node_id": node.id,
@@ -76,7 +76,7 @@ def handle_bid_request(node, bid_req: dict) -> dict:
     print(f"{TAG} Sending bid with score={node_resource_state['score']:.4f}")
 
     # NOTE: for testing
-    bid = {"type": "bid_accept",
+    bid = {"type": "bid",
            "payload": {
                "task_id": task_id,
                "node_id": node.id
