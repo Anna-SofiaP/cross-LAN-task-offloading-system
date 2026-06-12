@@ -230,7 +230,7 @@ class MessageBus:
         ##    "local": is_local,
         #}
         if not existed:
-            transport = "ZeroMQ (direct)" if lan == self.lan else "NATS (via broker)"
+            transport = "ZeroMQ (direct)" if lan == self.node.lan else "NATS (via broker)"
             print(f"{TAG} New peer discovered: {node_id} @ {ip} — transport: {transport}\n")
             for cb in self._peer_callbacks:
                 #await cb(node_id, self.peers[node_id])
