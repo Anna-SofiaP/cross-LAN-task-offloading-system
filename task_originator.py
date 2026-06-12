@@ -75,11 +75,11 @@ async def get_bids(node, bid_req: Message, sent_reqests: int):
                 bid = await node.bus.local_request((lan, peer_id, ip), bid_req)
 
             # NOTE: Remember that only bids with decision ACCEPT are added to the bids list!!!
-            # TODO: Handle bid_reject and bid_accept???
-            if bid.type == "bid_accept" and bid.payload["task_id"] == bid_req.payload["task_id"]:
+            if bid.type == "bid" and bid.payload["task_id"] == bid_req.payload["task_id"]:
                 #bid["_key"] = f"{bid['node_ip']}:{bid['peer_id']}"
-                bid_info = {f"{peer_id}": bid.payload}
-                bids.append(bid_info)
+                #bid_info = {f"bid_info": bid.payload}
+                #bids.append(bid_info)
+                bids.append(bid.payload)
 
                 # TODO: bid should be a Message, check format!
         #        print(f"{TAG} Bid from {peer_id}  "
@@ -92,6 +92,11 @@ async def get_bids(node, bid_req: Message, sent_reqests: int):
         except Exception as e: 
             print(f"{TAG} Error in receiving bids:\n{e}")
             continue
+
+    print(f"{TAG} All bids:")
+    for bid in bids:
+        # TODO: add print for decision: ACCEPTED/REJECTED
+        print(f"Bidder {bid["node_id"]}")
 
     return bids
 
@@ -119,7 +124,12 @@ async def run_negotiation(node, task_req: Message) -> dict:
     
     bids = await get_bids(node, bid_req, len(sent))
 
-    return {"results": "(placeholder)"}
+    # Pass all bidding node id:s so load_balanced_score sees the full picture
+#    all_bidders = [bid["node_id"] for bid in bids]
+#    ranked = sorted(bids,
+#        key=lambda bid: load_balanced_score(node, bid, all_bidders), reverse=True)
+
+    return {"results": bids}
 
 
 
