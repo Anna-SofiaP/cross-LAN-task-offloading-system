@@ -61,7 +61,7 @@ class Node:
 
         # Communication layer
         #self.bus = MessageBus(node_id=node_id, nats_url=nats_url, lan=lan)
-        self.bus = MessageBus(node, nats_url)
+        self.bus = MessageBus(self, nats_url)
 
         # Callbacks and handlers
         self.bus.on_peer_update(self._on_peer_update)

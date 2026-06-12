@@ -36,7 +36,7 @@ async def heartbeat_loop(node: Node):
             await node.bus.publish_heartbeat(lan=node.lan)
             print(
                 f"{TAG} Heartbeat sent. "
-                f"Known peers: {list(node.bus.peers.keys())}\n"
+                f"Known peers: {list(node.bus.peers)}\n"
             )
         except Exception as e:
             print(f"{TAG} Heartbeat error: {e}")

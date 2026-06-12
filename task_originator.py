@@ -5,7 +5,7 @@ import json
 from random import random
 from time import time
 import uuid
-from lstm_scoring import load_balanced_score
+#from lstm_scoring import load_balanced_score
 
 # TODO: modify task types and Message class so that PRIVATE_TASK is not a task type, but extra info about the task and task type.
 TASK_TYPES          = ["CLASSIFICATION", "TIMESERIES", "PRIVATE_TASK"]
@@ -110,7 +110,7 @@ async def run_negotiation(node, task_req: Message) -> dict:
 
     if not sent:
         print(f"{TAG} No nodes acknowledged -- skipping\n")
-        return None
+        return {"results": None}
 
     bid_req = Message(
         type="bid_request",
@@ -123,6 +123,9 @@ async def run_negotiation(node, task_req: Message) -> dict:
     )   
     
     bids = await get_bids(node, bid_req, len(sent))
+    if not bids:
+        print(f"{TAG} No bids received -- skipping\n")
+        return {"results": None}
 
     # Pass all bidding node id:s so load_balanced_score sees the full picture
 #    all_bidders = [bid["node_id"] for bid in bids]
