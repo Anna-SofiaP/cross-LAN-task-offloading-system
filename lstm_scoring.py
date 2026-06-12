@@ -102,9 +102,12 @@ def load_balanced_score(node, bid: dict, all_bidders: list = None) -> float:
     bonus   = NEW_NODE_BONUS if peer_task_assign_counts == 0 else 0.0
     adj     = round(raw - penalty + bonus, 4)
 
-    print(f"{TAG} Calculation resultst for {peer_id}:" \
+    print(f"{TAG} Calculation results for {peer_id}:" \
           f"    penalty = {penalty}" \
           f"    bonus = {bonus}" \
           f"    adjusted score = {adj}")
+    
+    final_score = max(0.0, min(1.0, adj))
+    bid["adj_score"] = final_score
 
-    return max(0.0, min(1.0, adj))
+    return final_score
