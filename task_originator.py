@@ -58,13 +58,13 @@ async def send_task_request(node, task_req) -> list:
 
 
 async def get_bids(node, bid_req: Message, sent_reqests: int):
-    print(f"{TAG} Asking for bids from peers, for task request {bid_req.payload['task_id']} ...")
+    print(f"{TAG} Asking for bids from peers, for task request {bid_req.payload["task_id"]} ...")
     bids = []
 
     for lan, peer_id, ip in node.peers:
         bid = None
         try:
-            if bid_req.payload['task_type'] != "PRIVATE_TASK":
+            if bid_req.payload["task_type"] != "PRIVATE_TASK":
                 bid = await node.bus.global_request((lan, peer_id, ip), bid_req)
 
             elif bid_req.payload["task_type"] == "PRIVATE_TASK":
@@ -103,9 +103,9 @@ async def get_bids(node, bid_req: Message, sent_reqests: int):
 
 
 async def run_negotiation(node, task_req: Message) -> dict:
-    print(f"\n{TAG} Running negotiation for task {task_req.payload['task_id']}...")
+    print(f"\n{TAG} Running negotiation for task {task_req.payload["task_id"]}...")
 
-    #broadcast_start = time()   # T1: first TASK_REQUEST sent
+    task_req_start = time()   # T1: first TASK_REQUEST sent
     sent = await send_task_request(node, task_req)
 
     if not sent:
@@ -117,8 +117,8 @@ async def run_negotiation(node, task_req: Message) -> dict:
         originator_node=node.id,
         originator_lan=node.lan,
         payload={
-            "task_id": task_req.payload['task_id'],
-            "task_type": task_req.payload['task_type']
+            "task_id": task_req.payload["task_id"],
+            "task_type": task_req.payload["task_type"]
         }
     )   
     
@@ -126,21 +126,46 @@ async def run_negotiation(node, task_req: Message) -> dict:
     if not bids:
         print(f"{TAG} No bids received -- skipping\n")
         return {"results": None}
+    
+    last_bid_time = time.time()      # T2: last bid received
 
     # Pass all bidding node id:s so load_balanced_score sees the full picture
     all_bidders = [bid["node_id"] for bid in bids]
     ranked = sorted(bids,
         key=lambda bid: load_balanced_score(node, bid, all_bidders), reverse=True)
     
-    print(f"{TAG} Bids ranked:" \
-          f"--> {ranked}")
+    print(f"{TAG} Final ranking: \n")
+    for i, bid in enumerate(ranked):
+        peer_id = bid["node_id"]
+        print(f"{i+1}. {peer_id}: raw score = {bid["score"]}, adjusted score = {bid["adj_score"]}, risk = {bid["risk"]}")
 
-    return {"results": bids}
+    #counts = dict(node.assigned_task_counts)
+    #for i, bid in enumerate(ranked):
+    #    k = bid["node_id"]
+    #    print(f"{TAG}  {i+1}. {k:<26} raw={b['score']:.4f}  "
+    #          f"adj={load_balanced_score(b, all_keys):.4f}  "
+    #          f"tasks={counts.get(k,0)}  risk={b['risk']}"
+
+    winner = ranked[0]
+    winner["task_id"]        = task_req.payload["task_id"]
+    winner["all_bids"]       = ranked
+    winner["task_req_start"] = task_req_start
+    winner["last_bid_time"]  = last_bid_time
+    print(f"{TAG} Selected: {winner['_key']}")
+    #print(f"{TAG} LLM reason: {winner['reason']}") # TODO: add the llm decision info also in the bids!
+
+    print(f"{TAG} winner: {winner}")    # NOTE: for seeing what info the 'winner' includes, can be removed later
+
+    return winner
+
+    #return {"results": bids}
 
 
 
 async def start(node):
-    """Start the Task Originator loop. This will periodically create new tasks and submit them to the MessageBus."""
+    """Start the Task Originator loop. 
+    This will periodically create new tasks and submit them to the MessageBus.
+    """
     task_cycle = itertools.cycle(TASK_TYPES)    # NOTE: just for now, for testing.
 
     while True:
@@ -165,4 +190,4 @@ async def start(node):
         )
 
         negotiation_results = await run_negotiation(node, task_req)
-        print(f"{TAG} Negotiation results: {negotiation_results["results"]}")
+        print(f"{TAG} Negotiation results: {negotiation_results}")
