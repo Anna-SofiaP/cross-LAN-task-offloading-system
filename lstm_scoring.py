@@ -3,6 +3,7 @@ import numpy as np
 HORIZON_H = 5
 LOAD_PENALTY = 0.05        # score penalty per task above average
 NEW_NODE_BONUS = 0.03      # bonus for nodes with 0 assignments
+TAG = "[SCORING]"
 
 
 # ---- LSTM prediction -----------------------------------------------------
@@ -54,7 +55,6 @@ def risk_level(score):
     return "CRITICAL"
 
 
-'''
 def load_balanced_score(node, bid: dict, all_bidders: list = None) -> float:
     """
     Adjusted score = raw - penalty + bonus
@@ -73,6 +73,8 @@ def load_balanced_score(node, bid: dict, all_bidders: list = None) -> float:
     peer_id = bid.get("node_id")
     raw = bid.get("score", 0.0)
 
+    print(f"{TAG} Calculating load balanced score for peer {peer_id}, score={raw}...")
+
     #with _assign_lock: 
     task_assign_counts = dict(node.assigned_task_counts)
 
@@ -82,13 +84,17 @@ def load_balanced_score(node, bid: dict, all_bidders: list = None) -> float:
     if all_bidders:
         live_peers = list(set(live_peers) | set(all_bidders))
 
+    print(f"{TAG} All live peers: {live_peers}")
+
     # Get the task assignment counts of all peers. If there are no live peers...
     all_task_assign_counts = {k: task_assign_counts.get(k, 0) for k in live_peers}
     if not all_task_assign_counts:
+        print(f"{TAG} No other nodes have been assigned a task before.")
         return round(raw + NEW_NODE_BONUS, 4)
 
     # Get the task assignment counts of the currently examined peer.
     peer_task_assign_counts = all_task_assign_counts.get(peer_id, 0)
+    print(f"{TAG} Task assign count of peer {peer_id}: {peer_task_assign_counts}")
 
     avg = sum(all_task_assign_counts.values()) / max(len(all_task_assign_counts), 1)
 
@@ -96,4 +102,9 @@ def load_balanced_score(node, bid: dict, all_bidders: list = None) -> float:
     bonus   = NEW_NODE_BONUS if peer_task_assign_counts == 0 else 0.0
     adj     = round(raw - penalty + bonus, 4)
 
-    return max(0.0, min(1.0, adj))'''
+    print(f"{TAG} Calculation resultst for {peer_id}:" \
+          f"    penalty = {penalty}" \
+          f"    bonus = {bonus}" \
+          f"    adjusted score = {adj}")
+
+    return max(0.0, min(1.0, adj))

@@ -5,7 +5,7 @@ import json
 from random import random
 from time import time
 import uuid
-#from lstm_scoring import load_balanced_score
+from lstm_scoring import load_balanced_score
 
 # TODO: modify task types and Message class so that PRIVATE_TASK is not a task type, but extra info about the task and task type.
 TASK_TYPES          = ["CLASSIFICATION", "TIMESERIES", "PRIVATE_TASK"]
@@ -24,7 +24,7 @@ async def send_task_request(node, task_req) -> list:
     sent = []
 
     for lan, peer_id, ip in node.peers:
-        print(f"{TAG} Sending task request to peer {peer_id}...\n")
+        print(f"{TAG} Sending task request to peer {peer_id}...")
     
         ack_msg = None
         acked = False
@@ -42,16 +42,16 @@ async def send_task_request(node, task_req) -> list:
 
                 if ack_msg and ack_msg.type == "ack":
                     sent.append(peer_id)
-                    print(f"{TAG} TASK_REQUEST acked by {peer_id}\n")
+                    print(f"{TAG} TASK_REQUEST acked by {peer_id}")
                     acked = True
                     break
             except Exception as e:
-                print(f"{TAG} {peer_id} attempt {attempt}/3: {e}\n")
+                print(f"{TAG} {peer_id} attempt {attempt}/3: {e}")
                 if attempt < 3:
                     await asyncio.sleep(3)
 
         if not acked:
-            print(f"{TAG} Could not reach {peer_id} after 3 attempts -- skipping")
+            print(f"{TAG} Could not reach {peer_id} after 3 attempts -- skipping\n")
     
     return sent
 
@@ -128,9 +128,12 @@ async def run_negotiation(node, task_req: Message) -> dict:
         return {"results": None}
 
     # Pass all bidding node id:s so load_balanced_score sees the full picture
-#    all_bidders = [bid["node_id"] for bid in bids]
-#    ranked = sorted(bids,
-#        key=lambda bid: load_balanced_score(node, bid, all_bidders), reverse=True)
+    all_bidders = [bid["node_id"] for bid in bids]
+    ranked = sorted(bids,
+        key=lambda bid: load_balanced_score(node, bid, all_bidders), reverse=True)
+    
+    print(f"{TAG} Bids ranked:" \
+          f"--> {ranked}")
 
     return {"results": bids}
 
