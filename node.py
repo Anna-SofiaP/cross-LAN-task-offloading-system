@@ -36,9 +36,9 @@ class Node:
         self.id = node_id
         self.lan = lan
         self.peers = []  # tuple: ("lan": str, "node_id": node_id, "ip": str|None)
+        self.assigned_task_counts = {}
 
         print(f"{TAG} Loading LSTM ...")
-        # TODO: install tf (tensorflow?)
         self.lstm_model = tf.keras.models.load_model(lstm_model_path)
         self.window_len = self.lstm_model.input_shape[1]
         print(f"{TAG} LSTM ready  window={self.window_len}")
@@ -52,12 +52,12 @@ class Node:
         
         self.task_cache = []
 
-        print(f"{TAG} Loading LLM ...")
-        self.llm_tok = AutoTokenizer.from_pretrained(llm_model_path, local_files_only=True)
-        self.llm_mdl = AutoModelForCausalLM.from_pretrained(
-            llm_model_path, dtype=torch.float16, device_map="cpu", local_files_only=True)
-        self.llm_mdl.eval()
-        print(f"{TAG} LLM ready")
+#        print(f"{TAG} Loading LLM ...")
+#        self.llm_tok = AutoTokenizer.from_pretrained(llm_model_path, local_files_only=True)
+#        self.llm_mdl = AutoModelForCausalLM.from_pretrained(
+#            llm_model_path, dtype=torch.float16, device_map="cpu", local_files_only=True)
+#        self.llm_mdl.eval()
+#        print(f"{TAG} LLM ready")
 
         # Communication layer
         #self.bus = MessageBus(node_id=node_id, nats_url=nats_url, lan=lan)
