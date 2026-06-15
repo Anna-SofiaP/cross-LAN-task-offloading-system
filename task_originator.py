@@ -6,7 +6,7 @@ from random import random
 from time import time
 import uuid
 from lstm_scoring import load_balanced_score
-from logger import log_latency
+#from logger import log_latency
 
 # TODO: modify task types and Message class so that PRIVATE_TASK is not a task type, but extra info about the task and task type.
 TASK_TYPES          = ["CLASSIFICATION", "TIMESERIES", "PRIVATE_TASK"]
@@ -40,12 +40,21 @@ async def enqueue_retry(node, task_type: str, task_id: str, attempts: int = 0):
     """
     Enqueue a deferred task for retry. If attempts >= MAX_RETRIES, the task is dropped.
     """
-
+    # BUG: Is this attempts variable ever increasing?
     if attempts < MAX_RETRIES:
         node.task_queue.appendleft((task_type, task_id, attempts))
         print(f"{TAG} Task {task_type} re-queued (attempt {attempts+1}/{MAX_RETRIES})")
     else:
         print(f"{TAG} Task {task_type} permanently dropped after {MAX_RETRIES} retries")
+
+
+def remove_dead_node(node, peer_id: str) -> bool:
+    """Remove dead or failed node from peers list."""
+
+    for peer in node.peers:
+        if peer[1] == peer_id:
+            node.peers.remove(peer)
+            break
 
 
 async def send_task_request(node, task_req) -> list:
@@ -106,14 +115,8 @@ async def get_bids(node, bid_req: Message, sent_reqests: int):
             if bid.type == "bid" and \
                 bid.payload["task_id"] == bid_req.payload["task_id"] and \
                 bid.payload["decision"] == "ACCEPT":
-                #bid["_key"] = f"{bid['node_ip']}:{bid['peer_id']}"
-                #bid_info = {f"bid_info": bid.payload}
-                #bids.append(bid_info)
-                bids.append(bid.payload)
 
-                # TODO: bid should be a Message, check format!
-        #        print(f"{TAG} Bid from {peer_id}  "
-        #              f"raw={bid.payload["score"]:.4f}  adj={load_balanced_score(node, peer_id, bid_info):.4f}")
+                bids.append(bid.payload)
                 
                 if len(bids) >= sent_reqests:
                     print(f"{TAG} All nodes responded!")
@@ -131,7 +134,7 @@ async def get_bids(node, bid_req: Message, sent_reqests: int):
 
 
 
-async def run_negotiation(node, task_req: Message) -> dict:
+async def run_negotiation(node, task_req: Message) -> dict | None:
     print(f"\n{TAG} Running negotiation for task {task_req.payload["task_id"]}...")
 
     task_req_start = time()   # T1: first TASK_REQUEST sent
@@ -139,7 +142,7 @@ async def run_negotiation(node, task_req: Message) -> dict:
 
     if not sent:
         print(f"{TAG} No nodes acknowledged -- skipping\n")
-        return {"results": None}
+        return None
 
     bid_req = Message(
         type="bid_request",
@@ -154,7 +157,7 @@ async def run_negotiation(node, task_req: Message) -> dict:
     bids = await get_bids(node, bid_req, len(sent))
     if not bids:
         print(f"{TAG} No bids received -- skipping\n")
-        return {"results": None}
+        return None
     
     last_bid_time = time()      # T2: last bid received
 
@@ -168,13 +171,7 @@ async def run_negotiation(node, task_req: Message) -> dict:
         peer_id = bid["node_id"]
         print(f"{i+1}. {peer_id}: raw score = {bid["score"]}, adjusted score = {bid["adj_score"]}, risk = {bid["risk"]}")
 
-    #counts = dict(node.assigned_task_counts)
-    #for i, bid in enumerate(ranked):
-    #    k = bid["node_id"]
-    #    print(f"{TAG}  {i+1}. {k:<26} raw={b['score']:.4f}  "
-    #          f"adj={load_balanced_score(b, all_keys):.4f}  "
-    #          f"tasks={counts.get(k,0)}  risk={b['risk']}"
-
+    # NOTE: remove the winner info and only keep the all_bids list + task_id and latency stuff?
     winner = ranked[0]
     winner["task_id"]        = task_req.payload["task_id"]
     winner["all_bids"]       = ranked
@@ -186,8 +183,6 @@ async def run_negotiation(node, task_req: Message) -> dict:
     print(f"{TAG} winner: {winner}")    # NOTE: for seeing what info the 'winner' includes, can be removed later
 
     return winner
-
-    #return {"results": bids}
 
 
 async def assign_task(node, winner_id: str, task_id: str, task_type: str) -> bool:
@@ -273,39 +268,57 @@ async def start(node):
         if negotiation_results:
             task_id = negotiation_results["task_id"]
             winner_id = negotiation_results["node_id"]
-            #assigned = False
+            all_bids = negotiation_results.pop("all_bids")
+            assigned = False
 
-            if await assign_task(node, winner_id, task_id, task_type):
-                task_assign_time = time()   # T3: TASK_ASSIGN sent
-                record_assignment(node, winner_id)
-                #assigned = True     # TODO: Is this needed? Doesn't assign_taks already return this info?
+            # TODO: sleep for some time here and then simulate node failure to test node failure handling
 
-                # Latency breakdown (excludes task execution)
-                t1 = negotiation_results.get("broadcast_start", task_assign_time)
-                t2 = negotiation_results.get("last_bid_time",   task_assign_time)
-                t3 = task_assign_time
+            # Go through the sorted all bids list. Attempt to assign the task to the winner node.
+            # If winner node is not available anymore, attempt to assign the task to the next node in the list.
+            # Continue with this logic until the task is assigned to a node, or until there are no nodes left
+            # to assign the task to.
+            for candidate in all_bids:
+                peer_id = candidate["node_id"]
 
-                lat_negotiation = (t2 - t1) * 1000   # broadcast -> last bid
-                lat_assignment  = (t3 - t2) * 1000   # last bid  -> task assign
-                lat_total       = (t3 - t1) * 1000   # broadcast -> task assign
+                if peer_id == winner_id:
+                    print(f"{TAG} Assigning task to the winner node {winner_id}...")
+                else:
+                    print(f"{TAG} Assigning task to node no. {all_bids.index(candidate) + 1} in the ranking list...")
+                
+                if await assign_task(node, peer_id, task_id, task_type):
+                    task_assign_time = time()   # T3: TASK_ASSIGN sent
+                    record_assignment(node, peer_id)
+                    assigned = True
+                    print(f"{TAG} Task assignment successful! Task assigned to node {peer_id}")
 
-                # NOTE: We don't have to await this
-                #log_latency(task_type,
-                #    winner_id, negotiation_results["score"],
-                #    negotiation_results["adj_score"],
-                #    lat_negotiation_ms=lat_negotiation,
-                #    lat_assignment_ms=lat_assignment,
-                #    lat_total_ms=lat_total,
-                #    retry_attempt=retry_attempt)
-            else:
-                pass
-                # Task assignment didn't succeed because 
-                # a) winner was not found in the peer list, or
-                # b) sending task assignment failed
-                # This is due to node failure, so we mark the node dead
-                #await mark_node_dead()
+                    # Latency breakdown (excludes task execution)
+                    t1 = negotiation_results.get("broadcast_start", task_assign_time)
+                    t2 = negotiation_results.get("last_bid_time",   task_assign_time)
+                    t3 = task_assign_time
 
-                # NOTE: should the task be assigned to the next best node if the winner node suddenly isn't available?
+                    lat_negotiation = (t2 - t1) * 1000   # broadcast -> last bid
+                    lat_assignment  = (t3 - t2) * 1000   # last bid  -> task assign
+                    lat_total       = (t3 - t1) * 1000   # broadcast -> task assign
+
+                    # NOTE: We don't have to await this
+                    #log_latency(task_type,
+                    #    winner_id, negotiation_results["score"],
+                    #    negotiation_results["adj_score"],
+                    #    lat_negotiation_ms=lat_negotiation,
+                    #    lat_assignment_ms=lat_assignment,
+                    #    lat_total_ms=lat_total,
+                    #    retry_attempt=retry_attempt)
+                    break
+                else:
+                    if all_bids.index(candidate) == 0:
+                        print(f"{TAG} Failed to assign task to the winner node." \
+                              "Attempting to assign task on another node...")
+                    
+                    await remove_dead_node(node, peer_id)
+
+            if not assigned:
+                print(f"{TAG} Task assignment failed for all nodes.")
+                await enqueue_retry(node, task_type, task_id, retry_attempt)
 
         else:
             print(f"{TAG} No bids for task {task_id}")
