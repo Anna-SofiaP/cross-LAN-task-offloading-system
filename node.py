@@ -51,6 +51,7 @@ class Node:
                    tasks_completed=0)
         
         self.task_cache = []
+        self.task_queue = deque()
 
 #        print(f"{TAG} Loading LLM ...")
 #        self.llm_tok = AutoTokenizer.from_pretrained(llm_model_path, local_files_only=True)
