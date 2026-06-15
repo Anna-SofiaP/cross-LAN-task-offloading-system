@@ -3,7 +3,6 @@ from dataclasses import dataclass
 import json
 from llm_decision import local_llm_decide
 
-
 TAG = "[Agent]"
 
 @dataclass
@@ -62,12 +61,33 @@ def handle_bid_request(node, bid_req: dict) -> dict:
                "score": node_resource_state["score"],
                "risk": node_resource_state["risk"],
 #               "reason": llm_decision["reason"], 
-#               "decision": "ACCEPT"
+               "decision": "ACCEPT"
             }
     }
 
     return bid
 
 
-def handle_task_assignment(node, task_assignment: Message):
-    pass
+def record_task(node, task_id: str):
+    # NOTE: If there are problems later, this is a spot where the issue might be...
+    # TODO: maybe we can just append the number? Maybe we should append task_id, too?
+    node.task_cache.append({"success": 1})
+
+
+def handle_task_assignment(node, task_assignment: dict):
+    task_id = task_assignment.get("task_id")
+    task_type = task_assignment.get("task_type")
+    winner_id = task_assignment.get("winner_id")
+
+    if winner_id == node.id:
+        print(f"\n{TAG} Received task assignment:\n" +
+              f"     task id={task_id}\n" +
+              f"     type={task_type}\n")
+        
+        node.state["is_busy"] = True
+
+        record_task(node, task_id)
+
+        # TODO: handle task execution somehow.
+
+    return {"type": "ack", "payload": {}}
