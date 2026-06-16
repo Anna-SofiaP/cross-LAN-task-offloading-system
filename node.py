@@ -12,10 +12,12 @@ Run this file directly to start a node:
 """
 
 from collections import deque
+from dataclasses import dataclass
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import task_originator
 import monitor
+import task_assign
 import asyncio
 import tensorflow as tf
 #import argparse
@@ -28,7 +30,14 @@ CONFIG_FILE= "node_config.yaml"
 HORIZON_H = 5
 
 
-# TODO: download lstm, put to good dir and change these paths!!!
+# TODO: download llm, put to good dir
+
+@dataclass
+class Message:
+    type: str
+    originator_node: str
+    originator_lan: str
+    payload: dict = None
 
 
 class Node:
@@ -53,6 +62,8 @@ class Node:
         self.task_cache = []
         self.task_queue = deque()
 
+        self.task_threads_and_results = {} # --> {"<TASK-ID>": {"thread": thread, "result": result}, "<TASK-ID-2>": ...}
+
 #        print(f"{TAG} Loading LLM ...")
 #        self.llm_tok = AutoTokenizer.from_pretrained(llm_model_path, local_files_only=True)
 #        self.llm_mdl = AutoModelForCausalLM.from_pretrained(
@@ -61,7 +72,6 @@ class Node:
 #        print(f"{TAG} LLM ready")
 
         # Communication layer
-        #self.bus = MessageBus(node_id=node_id, nats_url=nats_url, lan=lan)
         self.bus = MessageBus(self, nats_url)
 
         # Callbacks and handlers
@@ -73,9 +83,6 @@ class Node:
 
         # Connect transport layer first
         await self.bus.connect()
-
-        # Register incoming message handlers
-        #agent.register(self)
 
         # Start background loops concurrently
         await asyncio.gather(
@@ -90,7 +97,6 @@ class Node:
 
 
     async def _on_peer_update(self, node_id: str, info: dict):
-        #transport = "ZeroMQ (direct)" if info.get("local") else "NATS (via broker)"
         print(f"{TAG} Peer joined:" \
                 f"   Node ID: {node_id}" \
                 f"   LAN: {info['lan']}" \
@@ -116,7 +122,6 @@ if __name__ == "__main__":
         except yaml.YAMLError as exc:
             print(exc)
 
-#    node = Node(node_id=args.id, nats_url=args.nats)
     node = Node(node_id = config["nid"], 
                 lan = config["lan"], 
                 nats_url = config["nats-url"],
