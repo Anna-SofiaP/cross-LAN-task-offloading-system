@@ -1,5 +1,5 @@
 import asyncio
-#from dataclasses import dataclass
+from dataclasses import dataclass
 import itertools
 import json
 from random import random
@@ -7,7 +7,6 @@ from time import time
 import uuid
 import threading
 from lstm_scoring import load_balanced_score
-from node import Message
 from task_assign import do_task_assignment, enqueue_retry
 #from logger import log_latency
 
@@ -18,12 +17,12 @@ BID_TIMEOUT         = 160
 TASK_INTERVAL       = 15
 
 
-#@dataclass
-#class Message:
-#    type: str
-#    originator_node: str
-#    originator_lan: str
-#    payload: dict = None
+@dataclass
+class Message:
+    type: str
+    originator_node: str
+    originator_lan: str
+    payload: dict = None
 
 
 

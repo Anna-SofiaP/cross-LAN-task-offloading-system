@@ -1,9 +1,16 @@
+from dataclasses import dataclass
 from time import time
 
-from node import Message
 
 TAG = "[ASSIGN]"
 MAX_RETRIES = 3           # max retry attempts for a deferred task
+
+@dataclass
+class Message:
+    type: str
+    originator_node: str
+    originator_lan: str
+    payload: dict = None
 
 
 async def enqueue_retry(node, task_type: str, task_id: str, attempts: int = 0):
