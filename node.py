@@ -62,7 +62,7 @@ class Node:
         self.task_cache = []
         self.task_queue = deque()
 
-        self.task_threads_and_results = {} # --> {"<TASK-ID>": {"thread": thread, "result": result}, "<TASK-ID-2>": ...}
+        self.task_threads_and_results = [dict] # --> [{"task_id": tid, "thread": thread, "result": result}, {...}]
 
 #        print(f"{TAG} Loading LLM ...")
 #        self.llm_tok = AutoTokenizer.from_pretrained(llm_model_path, local_files_only=True)

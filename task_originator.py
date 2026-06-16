@@ -227,7 +227,10 @@ async def start(node):
                                       args=(node, task_id, task_type, retry_attempt, negotiation_results),
                                       daemon=True,
                                       name=f"exec_task_{task_id}")
-            node.task_threads_and_results[task_id]["thread"] = thread
+            
+            task_being_executed = {"task_id": task_id, "thread": thread, "result": None}
+            node.task_threads_and_results.append(task_being_executed)
+            
             thread.start()
 
         else:

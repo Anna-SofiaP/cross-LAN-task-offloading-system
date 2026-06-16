@@ -108,7 +108,10 @@ async def do_task_assignment(node, task_id: str, task_type: str, retry_attempt: 
         if result:
             record_assignment(node, peer_id)
             assigned = True
-            node.task_threads_and_results[task_id]["result"] = result["result"]
+            for task in node.task_threads_and_results:
+                if task["task_id"] == task_id:
+                    task["result"] = result
+                    break
             print(f"{TAG} Task assignment and execution successful! Task assigned to node {peer_id}")
 
             # Latency breakdown (excludes task execution)
