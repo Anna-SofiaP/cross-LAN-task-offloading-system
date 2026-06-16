@@ -1,16 +1,8 @@
 import asyncio
-from dataclasses import dataclass
 import json
 from llm_decision import local_llm_decide
 
 TAG = "[Agent]"
-
-@dataclass
-class Message:
-    type: str
-    originator_node: str
-    originator_lan: str
-    payload: dict = None
 
 
 def register(node):
@@ -69,7 +61,6 @@ def handle_bid_request(node, bid_req: dict) -> dict:
 
 
 def record_task(node, task_id: str):
-    # NOTE: If there are problems later, this is a spot where the issue might be...
     # TODO: maybe we can just append the number? Maybe we should append task_id, too?
     node.task_cache.append({"success": 1})
 
@@ -88,6 +79,12 @@ def handle_task_assignment(node, task_assignment: dict):
 
         record_task(node, task_id)
 
-        # TODO: handle task execution somehow.
+    # TODO: handle task execution somehow. This is now just for testing...
+    result = "task completed! Here can be any kind of data..."
+    type = "task_complete"
 
-    return {"type": "ack", "payload": {}}
+    return {"type": type, 
+            "payload": {
+                "task_id": task_id,
+                "result": result
+    }}
