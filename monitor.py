@@ -17,15 +17,6 @@ DISK_PATH = "/"
 SAMPLE_INTERVAL  = 1.0
 
 
-#async def start(node: Node):
-#    """Start all monitor loops concurrently."""
-#    print(f"{TAG} Starting for node {node.id}")
-#    await asyncio.gather(
-#        _heartbeat_loop(node),
-##        _stale_peer_cleanup_loop(node),
-#    )
-
-
 async def heartbeat_loop(node: Node):
     """Broadcast this node's presence and status to the whole cluster."""
 
@@ -43,7 +34,6 @@ async def heartbeat_loop(node: Node):
         await asyncio.sleep(HEARTBEAT_INTERVAL)
 
 
-# NOTE: should this be async? If yes, which parts need to be awaited?
 async def metric_loop(node: Node):
     """
     Continuously sample resource metrics, and compute predictions and suitability scores. 
