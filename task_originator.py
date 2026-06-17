@@ -7,14 +7,14 @@ from time import time
 import uuid
 import threading
 from lstm_scoring import load_balanced_score
-from task_assign import do_task_assignment, enqueue_retry
+from task_assign import assign_task, enqueue_retry, record_assignment
 #from logger import log_latency
 
 # TODO: modify task types and Message class so that PRIVATE_TASK is not a task type, but extra info about the task and task type.
-TASK_TYPES          = ["CLASSIFICATION", "TIMESERIES", "PRIVATE_TASK"]
-TAG                 = "[ORIG]"
-BID_TIMEOUT         = 160
-TASK_INTERVAL       = 15
+TASK_TYPES              = ["CLASSIFICATION", "TIMESERIES", "PRIVATE_TASK"]
+TAG                     = "[ORIG]"
+BID_TIMEOUT             = 160
+TASK_INTERVAL           = 15
 
 
 @dataclass
@@ -44,6 +44,7 @@ def remove_dead_node(node, peer_id: str) -> bool:
     for peer in node.peers:
         if peer[1] == peer_id:
             node.peers.remove(peer)
+            print(f"{TAG} Peer {peer[1]} (lan: {peer[0]}) removed from peers list.")
             break
 
 
@@ -180,15 +181,6 @@ async def run_negotiation(node, task_req: Message) -> dict | None:
     return results
 
 
-
-def send_task_and_get_result_thread(args):
-    task_exec_loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(task_exec_loop)
-
-    task_exec_loop.run_until_complete(do_task_assignment(args))
-    task_exec_loop.close()
-
-
 async def start(node):
     """Start the Task Originator loop. 
     This will periodically create new tasks and submit them to the MessageBus.
@@ -214,24 +206,70 @@ async def start(node):
             originator_lan=node.lan,
             payload={
                 "task_id": task_id,
-                "task_type": task_type
+                "task_type": task_type,
+                "in_data_sens_level": "??",
+                "out_data_sens_level": "??"
             }
         )
 
         negotiation_results = await run_negotiation(node, task_req)
         print(f"{TAG} Negotiation results: {negotiation_results}")
 
+        # TODO: change task assignment back to D's implementation. 
+        # For getting the task result, add a loop that queries the agent to get the results
+
         if negotiation_results:
-            #node.tasks_to_be_assigned.append(negotiation_results)
-            thread = threading.Thread(target=send_task_and_get_result_thread, 
-                                      args=(node, task_id, task_type, retry_attempt, negotiation_results),
-                                      daemon=True,
-                                      name=f"exec_task_{task_id}")
-            
-            task_being_executed = {"task_id": task_id, "thread": thread, "result": None}
-            node.task_threads_and_results.append(task_being_executed)
-            
-            thread.start()
+            task_type = negotiation_results["task_type"]
+            #winner_id = negotiation_results["node_id"]
+            all_bids = negotiation_results.pop("all_bids")
+            assigned = False
+
+            # TODO: sleep for some time here and then simulate node failure to test node failure handling
+
+            # Go through the sorted all bids list. Attempt to assign the task to the winner node.
+            # If winner node is not available anymore, attempt to assign the task to the next node in the list.
+            # Continue with this logic until the task is assigned to a node, or until there are no nodes left
+            # to assign the task to.
+            for candidate in all_bids:
+                peer_id = candidate["node_id"]
+
+                print(f"{TAG} Assigning task to node {peer_id}...")
+
+                task_assign_time = time()   # T3: task assignment sent
+
+                if await assign_task(node, peer_id, task_id, task_type):
+                    record_assignment(node, peer_id)
+                    assigned = True
+
+                    print(f"{TAG} Task assignment successful! Task assigned to node {peer_id}")
+
+                    # Latency breakdown (excludes task execution)
+                    t1 = negotiation_results.get("broadcast_start", task_assign_time)
+                    t2 = negotiation_results.get("last_bid_time",   task_assign_time)
+                    t3 = task_assign_time
+
+                    lat_negotiation = (t2 - t1) * 1000   # broadcast -> last bid
+                    lat_assignment  = (t3 - t2) * 1000   # last bid  -> task assign
+                    lat_total       = (t3 - t1) * 1000   # broadcast -> task assign
+
+                    # NOTE: We don't have to await this
+                    #log_latency(task_type,
+                    #    winner_id, negotiation_results["score"],
+                    #    negotiation_results["adj_score"],
+                    #    lat_negotiation_ms=lat_negotiation,
+                    #    lat_assignment_ms=lat_assignment,
+                    #    lat_total_ms=lat_total,
+                    #    retry_attempt=retry_attempt)
+                    break
+                else:
+                    if all_bids.index(candidate) == 0:
+                        print(f"{TAG} Failed to assign task to the winner node. -- next")
+
+                    remove_dead_node(node, peer_id)
+
+            if not assigned:
+                print(f"{TAG} Task assignment failed for all nodes.")
+                await enqueue_retry(node, task_type, task_id, retry_attempt)
 
         else:
             print(f"{TAG} No bids for task {task_id}")
