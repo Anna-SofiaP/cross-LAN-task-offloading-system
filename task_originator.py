@@ -1,11 +1,10 @@
 import asyncio
 from dataclasses import dataclass
 import itertools
-import json
 from random import random
 from time import time
 import uuid
-import threading
+from monitor import task_monitor_and_failover_loop
 from lstm_scoring import load_balanced_score
 from task_assign import assign_task, enqueue_retry, record_assignment
 #from logger import log_latency
@@ -15,6 +14,8 @@ TASK_TYPES              = ["CLASSIFICATION", "TIMESERIES", "PRIVATE_TASK"]
 TAG                     = "[ORIG]"
 BID_TIMEOUT             = 160
 TASK_INTERVAL           = 15
+FAILOVER_TIMEOUT        = 60
+HEARTBEAT_INTERVAL      = 20
 
 
 @dataclass
@@ -186,6 +187,47 @@ async def run_negotiation(node, task_req: Message) -> dict | None:
     return results
 
 
+'''
+async def task_monitor_and_failover_loop(node, task_id, task_type, peer):
+    """
+    Monitors assigned node. On failure:
+      - Marks node dead (only ONE thread handles each failure)
+      - Re-negotiates with remaining LIVE nodes
+      - Assigns same task to new winner (task completion guarantee)
+    """
+
+    peer_last_seen: float
+    peer_id = peer["node_id"]
+
+    for peer in node.bus.peers:
+        if peer[0] == peer_id:
+            peer_last_seen = peer[1]
+            break
+    
+    #wkey   = winner.get("_key", f"{winner['node_ip']}:{winner['node_id']}")
+    #missed = 0
+    print(f"{TAG} Failover monitoring started for {peer_id}, task {task_id}")
+
+    while True:
+        asyncio.sleep(HEARTBEAT_INTERVAL)
+        now = asyncio.get_event_loop().time()
+
+        for node_id, last_seen in node.bus.peers:
+            if node_id == peer_id:
+                if now - last_seen > FAILOVER_TIMEOUT:
+                    print(f"{TAG} Peer has not been sending heartbeat signal for >={FAILOVER_TIMEOUT} seconds.")
+                    remove_dead_node(node, peer_id)
+                    if len(node.peers) == 0:
+                        print(f"{TAG}")
+
+        
+        # TODO: what does this do?
+        #with _nodes_lock: 
+        #    info = _live_nodes.get(wkey)
+        #if not info:
+        #    print(f"[ORIG] Heartbeat: {wkey} removed -- stopping"); break'''
+
+
 async def start(node):
     """Start the Task Originator loop. 
     This will periodically create new tasks and submit them to the MessageBus.
@@ -266,6 +308,7 @@ async def start(node):
                     #    lat_assignment_ms=lat_assignment,
                     #    lat_total_ms=lat_total,
                     #    retry_attempt=retry_attempt)
+                    #asyncio.create_task(task_monitor_and_failover_loop(node, task_id, task_type, candidate))
                     break
                 else:
                     if all_bids.index(candidate) == 0:
