@@ -1,6 +1,6 @@
-import asyncio
-import json
+from time import time
 from llm_decision import local_llm_decide
+from threading import Thread
 
 TAG = "[Agent]"
 
@@ -61,8 +61,19 @@ def handle_bid_request(node, bid_req: dict) -> dict:
 
 
 def record_task(node, task_id: str):
-    # TODO: maybe we can just append the number? Maybe we should append task_id, too?
+    # TODO: change the idea of this task cache, it is not working very well now...
     node.task_cache.append({"success": 1})
+
+
+def execute_task(node, task_id: str):
+    print(f"{TAG} Executing {task_id} ...")
+    time.sleep(5)
+
+    node.state["is_busy"] = False
+    record_task(node, task_id)
+    node.state["tasks_completed"] = len(node.task_cache)
+
+    print(f"{TAG} Task {task_id} complete")
 
 
 def handle_task_assignment(node, task_assignment: dict):
@@ -77,14 +88,9 @@ def handle_task_assignment(node, task_assignment: dict):
         
         node.state["is_busy"] = True
 
-        record_task(node, task_id)
+    Thread(target=execute_task, args=(node, task_id,), daemon=True).start()
 
-    # TODO: handle task execution somehow. This is now just for testing...
-    result = "task completed! Here can be any kind of data..."
-    type = "task_complete"
-
-    return {"type": type, 
+    return {"type": "ack", 
             "payload": {
-                "task_id": task_id,
-                "result": result
+                "task_id": task_id
     }}
