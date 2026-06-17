@@ -44,7 +44,10 @@ def remove_dead_node(node, peer_id: str) -> bool:
     for peer in node.peers:
         if peer[1] == peer_id:
             node.peers.remove(peer)
-            print(f"{TAG} Peer {peer[1]} (lan: {peer[0]}) removed from peers list.")
+            node.bus.peers.remove(peer[1])
+            print(f"{TAG} Peer {peer[1]} (lan: {peer[0]}) removed from peers list." +
+                  f"    Know peers of node: {node.peers}" +
+                  f"    Known peers of messagebus: {node.bus.peers}")
             break
 
 
@@ -62,6 +65,7 @@ async def send_task_request(node, task_req) -> list:
                     ack_msg = await node.bus.global_request((lan, peer_id, ip), task_req)
 
                 elif task_req.payload["task_type"] == "PRIVATE_TASK":
+                    print(f"{TAG} Sending to: {lan}, {peer_id}, {ip}")
                     if not ip:
                         print(f"{TAG} Skipping global node...")
                         break
@@ -86,7 +90,7 @@ async def send_task_request(node, task_req) -> list:
 
 
 async def get_bids(node, bid_req: Message, sent_reqests: int):
-    print(f"{TAG} Asking for bids from peers, for task request {bid_req.payload["task_id"]} ...")
+    print(f"{TAG} Asking for bids from peers, for task {bid_req.payload["task_id"]} ...")
     bids = []
 
     for lan, peer_id, ip in node.peers:
@@ -96,9 +100,10 @@ async def get_bids(node, bid_req: Message, sent_reqests: int):
                 bid = await node.bus.global_request((lan, peer_id, ip), bid_req)
 
             elif bid_req.payload["task_type"] == "PRIVATE_TASK":
+                print(f"{TAG} Sending to: {lan}, {peer_id}, {ip}")
                 if not ip:
                     print(f"{TAG} Skipping global node...")
-                    break
+                    continue
 
                 bid = await node.bus.local_request((lan, peer_id, ip), bid_req)
 
@@ -215,8 +220,7 @@ async def start(node):
         negotiation_results = await run_negotiation(node, task_req)
         print(f"{TAG} Negotiation results: {negotiation_results}")
 
-        # TODO: change task assignment back to D's implementation. 
-        # For getting the task result, add a loop that queries the agent to get the results
+        # TODO: For getting the task result, add a loop that queries the agent to get the results
 
         if negotiation_results:
             task_type = negotiation_results["task_type"]
@@ -224,7 +228,7 @@ async def start(node):
             all_bids = negotiation_results.pop("all_bids")
             assigned = False
 
-            # TODO: sleep for some time here and then simulate node failure to test node failure handling
+            await asyncio.sleep(5) # NOTE: for testing!
 
             # Go through the sorted all bids list. Attempt to assign the task to the winner node.
             # If winner node is not available anymore, attempt to assign the task to the next node in the list.
@@ -236,6 +240,8 @@ async def start(node):
                 print(f"{TAG} Assigning task to node {peer_id}...")
 
                 task_assign_time = time()   # T3: task assignment sent
+
+                await asyncio.sleep(5) # NOTE: for testing!
 
                 if await assign_task(node, peer_id, task_id, task_type):
                     record_assignment(node, peer_id)
