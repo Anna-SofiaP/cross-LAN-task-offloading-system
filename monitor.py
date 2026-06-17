@@ -80,21 +80,3 @@ async def metric_loop(node: Node):
         print(f"{'-'*20}")
         
         await asyncio.sleep(SAMPLE_INTERVAL)
-
-
-'''async def _stale_peer_cleanup_loop(node: Node):
-    """Remove peers that have stopped sending heartbeats."""
-    while True:
-        await asyncio.sleep(node.bus.heartbeat_interval)
-        now = asyncio.get_event_loop().time()
-        stale = [
-            node_id
-            for node_id, info in node.bus.peers.items()
-            if now - info["last_seen"] > node.bus.peer_stale_timeout
-        ]
-        for node_id in stale:
-            del node.bus.peers[node_id]
-            sock = node.bus._zmq_dealers.pop(node_id, None)
-            if sock:
-                sock.close()
-            print(f"{TAG} Peer removed (stale): {node_id}")'''
