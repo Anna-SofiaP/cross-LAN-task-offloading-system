@@ -11,6 +11,7 @@ All communication looks identical to the application layer.
 import asyncio
 import json
 import socket
+from time import time
 from xml.sax import handler
 #import zmq
 import zmq.asyncio
@@ -187,14 +188,24 @@ class MessageBus:
 
         #is_local = same_subnet(self.local_ip, ip)
         existed = node_id in self.peers
-        self.peers.append(node_id)
+        last_seen = asyncio.get_event_loop().time()
 
         if not existed:
+            self.peers.append((node_id, last_seen))
             transport = "ZeroMQ (direct)" if lan == self.node.lan else "NATS (via broker)"
             print(f"{TAG} New peer discovered: {node_id} @ {ip} — transport: {transport}\n")
             for cb in self._peer_callbacks:
                 #await cb(node_id, self.peers[node_id])
                 await cb(node_id, {"ip": ip, "lan": lan})
+
+        else:
+            for peer in self.peers:
+                if peer[0] == node_id:
+                    print(f"{TAG} Peer {node_id} last seen: {peer[1]}")
+                    peer[1] = last_seen
+                    print(f"{TAG} Peer {node_id} new discovery time: {peer[1]}")
+                    break
+
 
     # TODO: make work!
     '''def get_available_peers(self) -> list[str]:
