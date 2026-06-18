@@ -4,7 +4,7 @@ import itertools
 from random import random
 from time import time
 import uuid
-from monitor import task_monitor_and_failover_loop
+#from monitor import task_monitor_and_failover_loop
 from lstm_scoring import load_balanced_score
 from task_assign import assign_task, enqueue_retry, record_assignment
 #from logger import log_latency
@@ -131,9 +131,21 @@ async def get_bids(node, bid_req: Message, sent_reqests: int):
 
 
 
-async def run_negotiation(node, task_req: Message) -> dict | None:
-    task_id = task_req.payload["task_id"]
-    task_type = task_req.payload["task_type"]
+async def run_negotiation(node, task_id: str, task_type: str) -> dict | None:
+    task_req = Message(
+            type="task_request",
+            originator_node=node.id,
+            originator_lan=node.lan,
+            payload={
+                "task_id": task_id,
+                "task_type": task_type,
+                "in_data_sens_level": "??",
+                "out_data_sens_level": "??"
+            }
+        )
+
+    #task_id = task_req.payload["task_id"]
+    #task_type = task_req.payload["task_type"]
     print(f"\n{TAG} Running negotiation for task {task_id}...")
 
     task_req_start = time()   # T1: first TASK_REQUEST sent
@@ -187,8 +199,8 @@ async def run_negotiation(node, task_req: Message) -> dict | None:
     return results
 
 
-'''
-async def task_monitor_and_failover_loop(node, task_id, task_type, peer):
+
+async def task_monitor_and_failover_loop(node, task_id: str, task_type: str, peer, retry_attempt: int):
     """
     Monitors assigned node. On failure:
       - Marks node dead (only ONE thread handles each failure)
@@ -196,13 +208,8 @@ async def task_monitor_and_failover_loop(node, task_id, task_type, peer):
       - Assigns same task to new winner (task completion guarantee)
     """
 
-    peer_last_seen: float
+    #peer_last_seen: float
     peer_id = peer["node_id"]
-
-    for peer in node.bus.peers:
-        if peer[0] == peer_id:
-            peer_last_seen = peer[1]
-            break
     
     #wkey   = winner.get("_key", f"{winner['node_ip']}:{winner['node_id']}")
     #missed = 0
@@ -213,19 +220,49 @@ async def task_monitor_and_failover_loop(node, task_id, task_type, peer):
         now = asyncio.get_event_loop().time()
 
         for node_id, last_seen in node.bus.peers:
+
             if node_id == peer_id:
+
                 if now - last_seen > FAILOVER_TIMEOUT:
                     print(f"{TAG} Peer has not been sending heartbeat signal for >={FAILOVER_TIMEOUT} seconds.")
                     remove_dead_node(node, peer_id)
-                    if len(node.peers) == 0:
-                        print(f"{TAG}")
 
-        
-        # TODO: what does this do?
-        #with _nodes_lock: 
-        #    info = _live_nodes.get(wkey)
-        #if not info:
-        #    print(f"[ORIG] Heartbeat: {wkey} removed -- stopping"); break'''
+                    if len(node.peers) == 0:
+                        print(f"{TAG} No remaining peers -- re-queueing task")
+                        enqueue_retry(node, task_type, task_id, retry_attempt)
+                        break
+
+                    # Run new negotiation with the other live peers
+                    print(f"{TAG} Failover with {len(node.peers)} node(s)")
+                    new_results = run_negotiation(node)
+
+                    if new_results:
+                        all_bids = new_results.pop("all_bids")
+                        assigned = False
+
+                        for candidate in all_bids:
+                            candidate_id = candidate["node_id"]
+
+                            if assign_task(node, candidate_id, task_id, task_type):
+                                record_assignment(node, candidate_id)
+
+                                print(f"\n{TAG} FAILOVER -> {candidate['_key']}")
+                                print(f"{TAG} Score: {candidate['score']:.4f}")
+                                print(f"{TAG} Reason: {candidate['reason']}")
+
+                                winner = candidate  # TODO: Is this needed anywhere?
+                                assigned = True
+                                break   # TODO: do we need to break from the higher loop, too?
+                            else:
+                                remove_dead_node(node, candidate_id)
+                        if not assigned:
+                            print(f"{TAG} All failover candidates failed -- re-queueing task")
+                            enqueue_retry(node, task_type, task_id, retry_attempt)
+                            break
+                    else:
+                        print(f"{TAG} No bids during failover -- re-queueing task")
+                        enqueue_retry(node, task_type, task_id, retry_attempt)
+                        break
 
 
 async def start(node):
@@ -242,35 +279,21 @@ async def start(node):
             await asyncio.sleep(TASK_INTERVAL)
             continue
 
-
         print(f"\n{TAG} {'='*52}")
         print(f"{TAG} New task: task id={task_id}, type={task_type}")
         print(f"{TAG} {'='*52}")
 
-        task_req = Message(
-            type="task_request",
-            originator_node=node.id,
-            originator_lan=node.lan,
-            payload={
-                "task_id": task_id,
-                "task_type": task_type,
-                "in_data_sens_level": "??",
-                "out_data_sens_level": "??"
-            }
-        )
 
-        negotiation_results = await run_negotiation(node, task_req)
+        negotiation_results = await run_negotiation(node, task_id, task_type)
         print(f"{TAG} Negotiation results: {negotiation_results}")
 
         # TODO: For getting the task result, add a loop that queries the agent to get the results
 
         if negotiation_results:
-            task_type = negotiation_results["task_type"]
+            #task_type = negotiation_results["task_type"]
             #winner_id = negotiation_results["node_id"]
             all_bids = negotiation_results.pop("all_bids")
             assigned = False
-
-            await asyncio.sleep(5) # NOTE: for testing!
 
             # Go through the sorted all bids list. Attempt to assign the task to the winner node.
             # If winner node is not available anymore, attempt to assign the task to the next node in the list.
@@ -308,7 +331,7 @@ async def start(node):
                     #    lat_assignment_ms=lat_assignment,
                     #    lat_total_ms=lat_total,
                     #    retry_attempt=retry_attempt)
-                    #asyncio.create_task(task_monitor_and_failover_loop(node, task_id, task_type, candidate))
+                    asyncio.create_task(task_monitor_and_failover_loop(node, task_id, task_type, candidate, retry_attempt))
                     break
                 else:
                     if all_bids.index(candidate) == 0:
