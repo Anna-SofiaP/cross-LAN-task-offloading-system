@@ -64,12 +64,12 @@ class Node:
 
         self.task_threads_and_results = [dict] # --> [{"task_id": tid, "thread": thread, "result": result}, {...}]
 
-#        print(f"{TAG} Loading LLM ...")
-#        self.llm_tok = AutoTokenizer.from_pretrained(llm_model_path, local_files_only=True)
-#        self.llm_mdl = AutoModelForCausalLM.from_pretrained(
-#            llm_model_path, dtype=torch.float16, device_map="cpu", local_files_only=True)
-#        self.llm_mdl.eval()
-#        print(f"{TAG} LLM ready")
+        print(f"{TAG} Loading LLM ...")
+        self.llm_tok = AutoTokenizer.from_pretrained(llm_model_path, local_files_only=True)
+        self.llm_mdl = AutoModelForCausalLM.from_pretrained(
+            llm_model_path, dtype=torch.float16, device_map="cpu", local_files_only=True)
+        self.llm_mdl.eval()
+        print(f"{TAG} LLM ready")
 
         # Communication layer
         self.bus = MessageBus(self, nats_url)
