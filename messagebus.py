@@ -186,8 +186,13 @@ class MessageBus:
         Currently there is only one callback registered by the Node class to just print the new peer info.
         """
 
-        #is_local = same_subnet(self.local_ip, ip)
-        existed = node_id in self.peers
+        existed = False
+
+        for peer in self.peers:
+            if peer[0] == node_id:
+                existed = True
+                break
+        
         last_seen = asyncio.get_event_loop().time()
 
         if not existed:
