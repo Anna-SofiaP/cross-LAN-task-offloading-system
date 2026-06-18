@@ -4,13 +4,15 @@ import traceback
 import torch
 
 ACCEPT_SCORE_MIN = 0.50
-TAG = "[LLM_DEC]"
+TAG = "[LLM]"
+
+# NOTE: Do we still need the task profiles?
 
 TASK_PROFILES = {
     "CLASSIFICATION": ("moderate CPU", "low memory",      "ML classification"),
     "CV_INFERENCE":   ("high CPU",     "moderate memory", "computer vision"),
     "TIMESERIES":     ("moderate CPU", "moderate memory", "time-series LSTM"),
-    "GENERIC":        ("moderate CPU", "moderate memory", "general compute"),
+    "PRIVATE_TASK":   ("moderate CPU", "moderate memory", "general compute"),   # NOTE. GENERIC
 }
 
 

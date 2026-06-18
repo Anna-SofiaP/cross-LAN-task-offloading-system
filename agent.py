@@ -36,13 +36,13 @@ def handle_bid_request(node, bid_req: dict) -> dict:
     print(f"[{TAG}] Evaluating {task_id}  score={node_resource_state['score']:.4f} " \
           f"risk={node_resource_state['risk']}  busy={node_resource_state.get('is_busy', False)}")
     
-#    llm_decision = local_llm_decide(node_resource_state, node.id, node.llm_tok, node.llm_mdl, task_type)
-#
-#    print(f"{TAG} Decision: {llm_decision['decision']}  reason: {llm_decision['reason']}")
-#
-#    if llm_decision["decision"] != "ACCEPT":
-#        print(f"{TAG} Not bidding -- REJECT")
-#        return {"type": "bid", "payload": {"task_id": task_id, "decision": "REJECT"}}
+    llm_decision = local_llm_decide(node_resource_state, node.id, node.llm_tok, node.llm_mdl, task_type)
+
+    print(f"{TAG} Decision: {llm_decision['decision']}  reason: {llm_decision['reason']}")
+
+    if llm_decision["decision"] != "ACCEPT":
+        print(f"{TAG} Not bidding -- REJECT")
+        return {"type": "bid", "payload": {"task_id": task_id, "decision": "REJECT"}}
 
     print(f"{TAG} Sending bid with score={node_resource_state['score']:.4f}")
 
@@ -52,7 +52,7 @@ def handle_bid_request(node, bid_req: dict) -> dict:
                "node_id": node.id,
                "score": node_resource_state["score"],
                "risk": node_resource_state["risk"],
-#               "reason": llm_decision["reason"], 
+               "reason": llm_decision["reason"], 
                "decision": "ACCEPT"
             }
     }
