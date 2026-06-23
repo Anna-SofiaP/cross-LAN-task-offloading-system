@@ -40,16 +40,21 @@ async def next_task(node, task_cycle) -> tuple[str, str, int]:
 
 
 def remove_dead_node(node, peer_id: str) -> bool:
-    """Remove dead or failed node from peers list."""
+    """Remove dead or failed node from message bus peers list and node peers list."""
 
     for peer in node.peers:
         if peer[1] == peer_id:
             node.peers.remove(peer)
-            node.bus.peers.remove(peer[1])
-            print(f"{TAG} Peer {peer[1]} (lan: {peer[0]}) removed from peers list." +
-                  f"    Know peers of node: {node.peers}" +
-                  f"    Known peers of messagebus: {node.bus.peers}")
             break
+
+    for peer in node.bus.peers:
+        if peer["node_id"] == peer_id:
+            node.bus.peers.remove(peer)
+            break
+
+    print(f"{TAG} Peer {peer[1]} (lan: {peer[0]}) removed from peers list." +
+      f"    Know peers of node: {node.peers}" +
+      f"    Known peers of messagebus: {node.bus.peers}")
 
 
 async def send_task_request(node, task_req) -> list:
