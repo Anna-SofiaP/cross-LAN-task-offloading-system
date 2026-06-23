@@ -109,7 +109,7 @@ class MessageBus:
 
     # TODO: merge global_request and local_request to one request function? And do decision about messaging there!
     # NOTE: Here you can change the timeout!!!!!!
-    async def global_request(self, to: tuple, msg: Message, timeout: float = 10.0) -> Message:
+    async def global_request(self, to: tuple, msg: Message, timeout: float = 20.0) -> Message:
         lan, topic, ip = to
         print(f"{TAG} Sending request to node {topic} in LAN {lan}\n")
         return await self._request_nats(topic, msg, timeout)
@@ -261,10 +261,13 @@ class MessageBus:
         try:
             data = json.loads(raw_msg.data)
             node_id = data["node_id"]
+
+            print(f"{TAG} Heartbeat signal from node: {node_id}")
+
             if node_id == self.node.id:
                 return  # ignore own heartbeat
             
-            print(f"{TAG} Received a heartbeat signal from a peer!\n")
+            #print(f"{TAG} Received a heartbeat signal from a peer!\n")
             
             await self._update_peer(node_id, data["lan"], data["ip"])
         except Exception as e:
@@ -308,7 +311,7 @@ class MessageBus:
             ack = await req_sock.recv_string()  # waits for REP to reply
             response = json.loads(ack)
             response = Message(**response)
-            
+
             return response
         except Exception as e:
             print(f"{TAG} Sending message via ZMQ to {ip} failed: {e}")
