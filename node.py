@@ -88,9 +88,9 @@ class Node:
             monitor.heartbeat_loop(self),
             monitor.metric_loop(self),
             # Task originator loop
-            task_originator.start(self),
+            #task_originator.start(self),
             # ZMQ loop
-            #self.bus._zmq_listen_loop()
+            self.bus._zmq_listen_loop()
         )
 
 
@@ -127,7 +127,7 @@ if __name__ == "__main__":
                 llm_model_path = config["llm-model"])
 
     try:
-        #agent.register(node)    # Register message handlers for NATS communication
+        agent.register(node)    # Register message handlers for NATS communication
         asyncio.run(node.start())
     except KeyboardInterrupt:
         print(f"\n{TAG} Node {config["nid"]} shutting down.")

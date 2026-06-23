@@ -70,13 +70,13 @@ async def metric_loop(node: Node):
             
         st = "READY" if ready else f"warming {n}/{node.window_len}"
 
-        print(f"{'-'*20}")
-        print(f"{TAG} Resource metrics:" \
-            f" cpu={cpu:.1f}%" \
-            f" mem={mem:.1f}%" \
-            f" pred_cpu={avg[0]*100:.1f}%" \
-            f" score={score:.4f}" \
-            f" risk={risk} [{st}]")
-        print(f"{'-'*20}")
+        #print(f"{'-'*20}")
+        #print(f"{TAG} Resource metrics:" \
+        #    f" cpu={cpu:.1f}%" \
+        #    f" mem={mem:.1f}%" \
+        #    f" pred_cpu={avg[0]*100:.1f}%" \
+        #    f" score={score:.4f}" \
+        #    f" risk={risk} [{st}]")
+        #print(f"{'-'*20}")
         
         await asyncio.sleep(SAMPLE_INTERVAL)
