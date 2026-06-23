@@ -296,7 +296,7 @@ class MessageBus:
         print(f"{TAG} Sending ZMQ message to {ip}...")
         try:
             req_sock = self.ctx.socket(zmq.REQ)
-            req_sock.setsockopt(zmq.RCVTIMEO, 5000)
+            #req_sock.setsockopt(zmq.RCVTIMEO, 5000)
             req_sock.setsockopt(zmq.LINGER, 0)
             req_sock.connect(f"tcp://{ip}:{self.ZMQ_PORT}")
 
