@@ -42,19 +42,20 @@ async def next_task(node, task_cycle) -> tuple[str, str, int]:
 def remove_dead_node(node, peer_id: str) -> bool:
     """Remove dead or failed node from message bus peers list and node peers list."""
 
+    # Remove peer from peer list mainained by the node
     for peer in node.peers:
         if peer[1] == peer_id:
             node.peers.remove(peer)
+            print(f"{TAG} Peer {peer[1]} (lan: {peer[0]}) removed from peers list." +
+                f"    Know peers of node: {node.peers}" +
+                f"    Known peers of messagebus: {node.bus.peers}")
             break
 
+    # Remove peer from peer list maintained by the message bus
     for peer in node.bus.peers:
         if peer["node_id"] == peer_id:
             node.bus.peers.remove(peer)
             break
-
-    print(f"{TAG} Peer {peer[1]} (lan: {peer[0]}) removed from peers list." +
-      f"    Know peers of node: {node.peers}" +
-      f"    Known peers of messagebus: {node.bus.peers}")
 
 
 async def send_task_request(node, task_req) -> list:
@@ -222,7 +223,7 @@ async def task_monitor_and_failover_loop(node, task_id: str, task_type: str, pee
 
         if node_id == peer_id:
             while True:
-                asyncio.sleep(HEARTBEAT_INTERVAL)
+                await asyncio.sleep(HEARTBEAT_INTERVAL)
                 now = asyncio.get_event_loop().time()
 
                 if now - last_seen > FAILOVER_TIMEOUT:
