@@ -58,7 +58,6 @@ def get_local_ip() -> str:
 class MessageBus:
     ZMQ_PORT = 5555
 
-    #def __init__(self, node_id: str, nats_url: str, lan: str, heartbeat_interval=30):
     def __init__(self, node, nats_url, heartbeat_interval=30):
         self.node = node                # The node object is passed to the messagebus
         self.nats_url = nats_url
@@ -109,7 +108,8 @@ class MessageBus:
     
 
     # TODO: merge global_request and local_request to one request function? And do decision about messaging there!
-    async def global_request(self, to: tuple, msg: Message, timeout: float = 3.0) -> Message:
+    # NOTE: Here you can change the timeout!!!!!!
+    async def global_request(self, to: tuple, msg: Message, timeout: float = 10.0) -> Message:
         lan, topic, ip = to
         print(f"{TAG} Sending request to node {topic} in LAN {lan}\n")
         return await self._request_nats(topic, msg, timeout)
@@ -189,32 +189,33 @@ class MessageBus:
         existed = False
 
         for peer in self.peers:
-            if peer[0] == node_id:
+            if peer["node_id"] == node_id:
                 existed = True
                 break
         
         last_seen = asyncio.get_event_loop().time()
 
         if not existed:
-            self.peers.append((node_id, last_seen))
-            transport = "ZeroMQ (direct)" if lan == self.node.lan else "NATS (via broker)"
-            print(f"{TAG} New peer discovered: {node_id} @ {ip} — transport: {transport}\n")
+            self.peers.append({"node_id": node_id, "last_seen": last_seen})
+
+            print(f"{TAG} New peer discovered: {node_id} @ {ip}\n")
+
             for cb in self._peer_callbacks:
                 #await cb(node_id, self.peers[node_id])
                 await cb(node_id, {"ip": ip, "lan": lan})
 
         else:
             for peer in self.peers:
-                if peer[0] == node_id:
-                    print(f"{TAG} Peer {node_id} last seen: {peer[1]}")
-                    peer[1] = last_seen
-                    print(f"{TAG} Peer {node_id} new discovery time: {peer[1]}")
+                if peer["node_id"] == node_id:
+                    print(f"{TAG} Peer {node_id} last seen: {peer["node_id"]}")
+                    peer["node_id"] = last_seen
+                    print(f"{TAG} Peer {node_id} new discovery time: {peer["node_id"]}")
                     break
 
 
     # TODO: make work!
     '''def get_available_peers(self) -> list[str]:
-        """Return node IDs of all peers currently conneced to the cluster."""
+        """Return node IDs of all peers currently connected to the cluster."""
         return [nid for nid, info in self.peers.items()]'''
 
 
@@ -240,7 +241,6 @@ class MessageBus:
             return response
         except Exception as e:
             print(f"{TAG} NATS request to {topic} failed: {e}")
-            #return None
             raise
 
 
@@ -308,7 +308,7 @@ class MessageBus:
             ack = await req_sock.recv_string()  # waits for REP to reply
             response = json.loads(ack)
             response = Message(**response)
-            #msg = Message(msg.type, msg.originator_lan, msg.originator_node, msg.payload)
+            
             return response
         except Exception as e:
             print(f"{TAG} Sending message via ZMQ to {ip} failed: {e}")
