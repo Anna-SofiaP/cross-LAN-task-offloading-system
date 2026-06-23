@@ -139,8 +139,8 @@ async def run_negotiation(node, task_id: str, task_type: str) -> dict | None:
             payload={
                 "task_id": task_id,
                 "task_type": task_type,
-                "in_data_sens_level": "??",
-                "out_data_sens_level": "??"
+                #"in_data_sens_level": "??",
+                #"out_data_sens_level": "??"
             }
         )
 
@@ -192,7 +192,7 @@ async def run_negotiation(node, task_id: str, task_type: str) -> dict | None:
     results["last_bid_time"]  = last_bid_time
 
     print(f"{TAG} Selected winner: {ranked[0]["node_id"]}")
-    #print(f"{TAG} LLM reason: {winner['reason']}") # TODO: add the llm decision info also in the bids!
+    #print(f"{TAG} LLM reason: {winner['reason']}")
 
     print(f"{TAG} Ranking: {results}")
 
@@ -201,68 +201,67 @@ async def run_negotiation(node, task_id: str, task_type: str) -> dict | None:
 
 
 async def task_monitor_and_failover_loop(node, task_id: str, task_type: str, peer, retry_attempt: int):
-    """
-    Monitors assigned node. On failure:
+    """ Monitors assigned node. On failure:
       - Marks node dead (only ONE thread handles each failure)
       - Re-negotiates with remaining LIVE nodes
       - Assigns same task to new winner (task completion guarantee)
     """
-
-    #peer_last_seen: float
     peer_id = peer["node_id"]
-    
-    #wkey   = winner.get("_key", f"{winner['node_ip']}:{winner['node_id']}")
-    #missed = 0
+    node_failure = False
+
     print(f"{TAG} Failover monitoring started for {peer_id}, task {task_id}")
 
-    while True:
-        asyncio.sleep(HEARTBEAT_INTERVAL)
-        now = asyncio.get_event_loop().time()
+    for peer in node.bus.peers:
+        node_id = peer["node_id"]
+        last_seen = peer["last_seen"]
 
-        for node_id, last_seen in node.bus.peers:
-
-            if node_id == peer_id:
+        if node_id == peer_id:
+            while True:
+                asyncio.sleep(HEARTBEAT_INTERVAL)
+                now = asyncio.get_event_loop().time()
 
                 if now - last_seen > FAILOVER_TIMEOUT:
                     print(f"{TAG} Peer has not been sending heartbeat signal for >={FAILOVER_TIMEOUT} seconds.")
                     remove_dead_node(node, peer_id)
+                    node_failure = True
+                    break
 
-                    if len(node.peers) == 0:
-                        print(f"{TAG} No remaining peers -- re-queueing task")
-                        enqueue_retry(node, task_type, task_id, retry_attempt)
-                        break
+    if len(node.peers) == 0:
+        print(f"{TAG} No remaining peers -- re-queueing task")
+        enqueue_retry(node, task_type, task_id, retry_attempt)
+        # No reason to run new negotiation at this point.
+        return
 
-                    # Run new negotiation with the other live peers
-                    print(f"{TAG} Failover with {len(node.peers)} node(s)")
-                    new_results = run_negotiation(node)
+    if node_failure:
+        # Run new negotiation with the other live peers
+        print(f"{TAG} Failover with {len(node.peers)} node(s)")
+        new_results = run_negotiation(node)
 
-                    if new_results:
-                        all_bids = new_results.pop("all_bids")
-                        assigned = False
+        if new_results:
+            all_bids = new_results.pop("all_bids")
+            assigned = False
 
-                        for candidate in all_bids:
-                            candidate_id = candidate["node_id"]
+            for candidate in all_bids:
+                candidate_id = candidate["node_id"]
 
-                            if assign_task(node, candidate_id, task_id, task_type):
-                                record_assignment(node, candidate_id)
+                if assign_task(node, candidate_id, task_id, task_type):
+                    record_assignment(node, candidate_id)
 
-                                print(f"\n{TAG} FAILOVER -> {candidate['_key']}")
-                                print(f"{TAG} Score: {candidate['score']:.4f}")
-                                print(f"{TAG} Reason: {candidate['reason']}")
+                    print(f"\n{TAG} FAILOVER -> {candidate["node_id"]}")
+                    print(f"{TAG} Score: {candidate["score"]:.4f}")
+                    #print(f"{TAG} Reason: {candidate["reason"]}")
 
-                                winner = candidate  # TODO: Is this needed anywhere?
-                                assigned = True
-                                break   # TODO: do we need to break from the higher loop, too?
-                            else:
-                                remove_dead_node(node, candidate_id)
-                        if not assigned:
-                            print(f"{TAG} All failover candidates failed -- re-queueing task")
-                            enqueue_retry(node, task_type, task_id, retry_attempt)
-                            break
-                    else:
-                        print(f"{TAG} No bids during failover -- re-queueing task")
-                        enqueue_retry(node, task_type, task_id, retry_attempt)
-                        break
+                    #winner = candidate
+                    assigned = True
+                    break
+                else:
+                    remove_dead_node(node, candidate_id)
+            if not assigned:
+                print(f"{TAG} All failover candidates failed -- re-queueing task")
+                enqueue_retry(node, task_type, task_id, retry_attempt)
+        else:
+            print(f"{TAG} No bids during failover -- re-queueing task")
+            enqueue_retry(node, task_type, task_id, retry_attempt)
 
 
 async def start(node):
