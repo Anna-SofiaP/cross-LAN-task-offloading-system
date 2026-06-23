@@ -17,7 +17,9 @@ TASK_PROFILES = {
 }
 
 
-def local_llm_decide(state: dict, node_id: str, llm_tok, llm_mdl, task_type: str = "GENERIC") -> dict:
+def local_llm_decide(state: dict, node_id: str, llm_tok, llm_mdl, task_type: str) -> dict:
+    print(f"{TAG} Running LLM decision for task of type {task_type}")
+
     cpu   = state["cpu"]      * 100
     mem   = state["mem"]      * 100
     disk  = state["disk"]     * 100
@@ -32,7 +34,7 @@ def local_llm_decide(state: dict, node_id: str, llm_tok, llm_mdl, task_type: str
     def lvl(v, lo, hi): 
         return "high" if v>hi else ("moderate" if v>lo else "low")
 
-    cpu_need, mem_need, desc = TASK_PROFILES.get(task_type, TASK_PROFILES["GENERIC"])
+    cpu_need, mem_need, desc = TASK_PROFILES.get(task_type)
 
     horizon = state.get("horizon", [])
     cpu_trend = mem_trend = "stable"
