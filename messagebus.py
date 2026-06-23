@@ -207,9 +207,9 @@ class MessageBus:
         else:
             for peer in self.peers:
                 if peer["node_id"] == node_id:
-                    print(f"{TAG} Peer {node_id} last seen: {peer["node_id"]}")
-                    peer["node_id"] = last_seen
-                    print(f"{TAG} Peer {node_id} new discovery time: {peer["node_id"]}")
+                    print(f"{TAG} Peer {node_id} last seen: {peer["last_seen"]}")
+                    peer["last_seen"] = last_seen
+                    print(f"{TAG} Peer {node_id} new discovery time: {peer["last_seen"]}")
                     break
 
 
