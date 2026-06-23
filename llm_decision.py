@@ -6,7 +6,8 @@ import torch
 ACCEPT_SCORE_MIN = 0.50
 TAG = "[LLM]"
 
-# NOTE: Do we still need the task profiles?
+# TODO: Modify these task profiles to fit the privacy implementation and the privacy and
+# trustworthiness levels.
 
 TASK_PROFILES = {
     "CLASSIFICATION": ("moderate CPU", "low memory",      "ML classification"),

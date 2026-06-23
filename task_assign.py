@@ -17,7 +17,6 @@ async def enqueue_retry(node, task_type: str, task_id: str, attempts: int = 0):
     """
     Enqueue a deferred task for retry. If attempts >= MAX_RETRIES, the task is dropped.
     """
-    # BUG: Is this attempts variable ever increasing?
     if attempts < MAX_RETRIES:
         node.task_queue.appendleft((task_type, task_id, attempts))
         print(f"{TAG} Task {task_type} re-queued (attempt {attempts+1}/{MAX_RETRIES})")

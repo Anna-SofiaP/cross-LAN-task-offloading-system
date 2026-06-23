@@ -61,7 +61,6 @@ def handle_bid_request(node, bid_req: dict) -> dict:
 
 
 def record_task(node, task_id: str):
-    # TODO: change the idea of this task cache, it is not working very well now...
     node.task_cache.append({"success": 1})
 
 

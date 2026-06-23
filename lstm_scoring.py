@@ -80,7 +80,7 @@ def load_balanced_score(node, bid: dict, all_bidders: list = None) -> float:
 
     # Build a map of the task assignments counts for all live peers, including live nodes with 0 assignments
     # Get the node_id value from the peer info tuple, for each peer in the peer list
-    live_peers = [peer[1] for peer in node.peers]   # BUG: the peer removing has not been implemented yet!
+    live_peers = [peer[1] for peer in node.peers]
     if all_bidders:
         live_peers = list(set(live_peers) | set(all_bidders))
 

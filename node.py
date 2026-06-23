@@ -30,8 +30,6 @@ CONFIG_FILE= "node_config.yaml"
 HORIZON_H = 5
 
 
-# TODO: download llm, put to good dir
-
 @dataclass
 class Message:
     type: str
