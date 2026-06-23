@@ -25,7 +25,7 @@ from messagebus import MessageBus
 import agent
 import yaml
 
-TAG = "[Node]"
+TAG = "[NODE]"
 CONFIG_FILE= "node_config.yaml"
 HORIZON_H = 5
 

@@ -2,7 +2,7 @@ import time
 from llm_decision import local_llm_decide
 from threading import Thread
 
-TAG = "[Agent]"
+TAG = "[AGENT]"
 
 
 def register(node):
