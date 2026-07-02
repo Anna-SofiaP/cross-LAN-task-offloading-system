@@ -13,7 +13,7 @@ def register(node):
     node.bus.on("task_assignment", handle_task_assignment)
 
 
-def handle_task_request(node, task_req: dict) -> dict:
+def handle_task_request(node, task_req: dict, originator_lan: str) -> dict:
     task_id = task_req.get("task_id")
     task_type = task_req.get("task_type")
 
@@ -92,7 +92,7 @@ def execute_task(node, task_id: str):
     print(f"{TAG} Task {task_id} complete")
 
 
-def handle_task_assignment(node, task_assignment: dict):
+def handle_task_assignment(node, task_assignment: dict, originator_lan: str) -> dict:
     task_id = task_assignment.get("task_id")
     task_type = task_assignment.get("task_type")
     winner_id = task_assignment.get("winner_id")
