@@ -24,15 +24,14 @@ def handle_task_request(node, task_req: dict) -> dict:
     return {"type": "ack", "payload": {}}
 
 
-def handle_bid_request(node, bid_req: dict) -> dict:
+def handle_bid_request(node, bid_req: dict, originator_lan: str) -> dict:
     task_id = bid_req.get("task_id")
     task_type = bid_req.get("task_type")
-    originator_lan = bid_req.get("originator_lan")
-    payload = bid_req.get("payload", {})
+    #FIXME: originator_lan = bid_req.get("originator_lan")
 
-    in_data_privacy_lvl = payload["in_data_privacy_lvl"]
-    out_data_privacy_lvl = payload["out_data_privacy_lvl"]
-    task_priority = payload["task_priority"]
+    in_data_privacy_lvl = bid_req.get("in_data_privacy_lvl")
+    out_data_privacy_lvl = bid_req.get("out_data_privacy_lvl")
+    task_priority = bid_req.get("task_priority")
 
     print(f"\n{TAG} Received bid request: " +
           f"     task id={task_id}" +

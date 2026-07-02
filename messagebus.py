@@ -31,7 +31,7 @@ class Message:
 
      - type: determines how the message is handled by the receiving node, can be for example 'task_req', 'bid'
      - originator_node: the node_id of the sender, used for routing replies.
-     - originator_lan: the LAN of the sender, used for debugging.
+     - originator_lan: the LAN name/id of the sender.
      - payload: can contain any data relevant to the message type."""
     
     type: str
@@ -346,7 +346,7 @@ class MessageBus:
         handler = self._handlers.get(msg.type)
 
         if handler:
-            result = handler(self.node, msg.payload)
+            result = handler(self.node, msg.payload, originator_lan=msg.originator_lan)
 
             if asyncio.iscoroutine(result):
                 result = await result
