@@ -1,6 +1,6 @@
 import time
 from llm_decision import local_llm_decide
-from robustness_privacy_scoring import get_reliability_level, get_privacy_level, get_network_access_and_trust_level
+from robustness_privacy_scoring import get_reliability_level, get_privacy_level
 from threading import Thread
 
 TAG = "[AGENT]"

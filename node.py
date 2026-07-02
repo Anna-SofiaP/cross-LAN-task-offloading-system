@@ -13,7 +13,8 @@ Run this file directly to start a node:
 
 from collections import deque
 from dataclasses import dataclass
-from datetime import time
+#from datetime import time
+import time
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import task_originator
@@ -136,14 +137,20 @@ if __name__ == "__main__":
             print(exc)
 
     # Record the time of new node restart
-    new_restart_time = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    #new_restart_time = time.strftime(time.gmtime(), "%Y-%m-%dT%H:%M:%SZ")
+    new_restart_time = time.time()
 
     # Remove restart timestamps older than 7 days
     print(f"{TAG} Remove restart timestamps older than {NODE_FAILURE_LOGGING_PERIOD} days...")
-    for old_restart_time in config.get("restart-times", []):
-        if new_restart_time - old_restart_time > NODE_FAILURE_LOGGING_PERIOD * 24 * 60 * 60:
-            config["restart-times"].pop(0)
 
+    restart_times = config.get("restart-times", [])
+    if restart_times:
+        for old_restart_time in restart_times:
+            if new_restart_time - old_restart_time > NODE_FAILURE_LOGGING_PERIOD * 24 * 60 * 60:
+                config["restart-times"].pop(0)
+    else:
+        config["restart-times"] = []
+    
     # Add the new restart timestamp to the list
     config["restart-times"].append(new_restart_time)
 
@@ -158,7 +165,7 @@ if __name__ == "__main__":
 
     # Write the updated configuration back to the YAML file
     with open(CONFIG_FILE, 'w') as outfile:
-        yaml.dump(config, outfile, default_flow_style=False)
+        yaml.dump(config, outfile, default_flow_style=False, indent=4)
 
     # Run the node
     try:
