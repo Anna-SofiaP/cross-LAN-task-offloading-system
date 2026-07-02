@@ -1,7 +1,7 @@
 import asyncio
 from dataclasses import dataclass
 import itertools
-from random import random
+import random
 from time import time
 import uuid
 #from monitor import task_monitor_and_failover_loop
@@ -9,8 +9,10 @@ from lstm_scoring import load_balanced_score
 from task_assign import assign_task, enqueue_retry, record_assignment
 #from logger import log_latency
 
-# TODO: modify task types and Message class so that PRIVATE_TASK is not a task type, but extra info about the task and task type.
-TASK_TYPES              = ["CLASSIFICATION", "TIMESERIES", "PRIVATE_TASK"]
+TASK_TYPES              = ["CLASSIFICATION", "TIMESERIES", "CV_INFERENCE"]
+DATA_PRIVACY_LEVELS     = ["PUBLIC", "INTERNAL", "CONFIDENTIAL", "RESTRICTED"]
+TASK_PRIORITY_LEVELS    = ["HIGH", "MEDIUM", "LOW"]
+
 TAG                     = "[ORIG]"
 BID_TIMEOUT             = 160
 TASK_INTERVAL           = 15
@@ -28,15 +30,19 @@ class Message:
 
 
 async def next_task(node, task_cycle) -> tuple[str, str, int]:
-    """Returns (task_type, retry_attempt). Retry queue takes priority."""
+    """Returns the new task. Retry queue takes priority."""
+    in_data_privacy_level = random.choice(DATA_PRIVACY_LEVELS)
+    out_data_privacy_level = random.choice(DATA_PRIVACY_LEVELS)
+    task_priority = random.choice(TASK_PRIORITY_LEVELS)
+
     if node.task_queue:
-        task_type, task_id, attempts = node.task_queue.pop()
+        task_type, task_id, in_data_privacy_lvl, out_data_privacy_lvl, t_priority, attempts = node.task_queue.pop()
         print(f"[ORIG] Retrying deferred task: {task_id} of type {task_type} (attempt {attempts+1})")
-        return task_type, task_id, attempts + 1
+        return task_type, task_id, in_data_privacy_lvl, out_data_privacy_lvl, t_priority, attempts + 1
     
     task_id = str(uuid.uuid4())[:8]
 
-    return next(task_cycle), task_id, 0
+    return next(task_cycle), task_id, in_data_privacy_level, out_data_privacy_level, task_priority, 0
 
 
 def remove_dead_node(node, peer_id: str) -> bool:
@@ -68,16 +74,18 @@ async def send_task_request(node, task_req) -> list:
         acked = False
         for attempt in range(1, 4):
             try:
-                if task_req.payload["task_type"] != "PRIVATE_TASK":
-                    ack_msg = await node.bus.global_request((lan, peer_id, ip), task_req)
-
-                elif task_req.payload["task_type"] == "PRIVATE_TASK":
-                    print(f"{TAG} Sending to: {lan}, {peer_id}, {ip}")
-                    if not ip:
-                        print(f"{TAG} Skipping global node...")
-                        break
-
-                    ack_msg = await node.bus.local_request((lan, peer_id, ip), task_req)
+                #TODO: global_request to just request, local or global sending should be decided in message bus!
+                ack_msg = await node.bus.global_request((lan, peer_id, ip), task_req)
+#                if task_req.payload["task_type"] != "PRIVATE_TASK":
+#                    ack_msg = await node.bus.global_request((lan, peer_id, ip), task_req)
+#
+#                elif task_req.payload["task_type"] == "PRIVATE_TASK":
+#                    print(f"{TAG} Sending to: {lan}, {peer_id}, {ip}")
+#                    if not ip:
+#                        print(f"{TAG} Skipping global node...")
+#                        break
+#
+#                    ack_msg = await node.bus.local_request((lan, peer_id, ip), task_req)
 
                 if ack_msg and ack_msg.type == "ack":
                     sent.append(peer_id)
@@ -103,16 +111,17 @@ async def get_bids(node, bid_req: Message, sent_reqests: int):
     for lan, peer_id, ip in node.peers:
         bid = None
         try:
-            if bid_req.payload["task_type"] != "PRIVATE_TASK":
-                bid = await node.bus.global_request((lan, peer_id, ip), bid_req)
-
-            elif bid_req.payload["task_type"] == "PRIVATE_TASK":
-                print(f"{TAG} Sending to: {lan}, {peer_id}, {ip}")
-                if not ip:
-                    print(f"{TAG} Skipping global node...")
-                    continue
-
-                bid = await node.bus.local_request((lan, peer_id, ip), bid_req)
+            bid = await node.bus.global_request((lan, peer_id, ip), bid_req)
+#            if bid_req.payload["task_type"] != "PRIVATE_TASK":
+#                bid = await node.bus.global_request((lan, peer_id, ip), bid_req)
+#
+#            elif bid_req.payload["task_type"] == "PRIVATE_TASK":
+#                print(f"{TAG} Sending to: {lan}, {peer_id}, {ip}")
+#                if not ip:
+#                    print(f"{TAG} Skipping global node...")
+#                    continue
+#
+#                bid = await node.bus.local_request((lan, peer_id, ip), bid_req)
 
             # NOTE: Remember that only bids with decision ACCEPT are added to the bids list!!!
             if bid.type == "bid" and \
@@ -137,7 +146,10 @@ async def get_bids(node, bid_req: Message, sent_reqests: int):
 
 
 
-async def run_negotiation(node, task_id: str, task_type: str) -> dict | None:
+async def run_negotiation(node, task_id: str, task_type: str, in_data_privacy_lvl: str, 
+                          out_data_privacy_lvl: str, task_priority: str) -> dict | None:
+    """Run negotiation for a task."""
+
     task_req = Message(
             type="task_request",
             originator_node=node.id,
@@ -145,13 +157,9 @@ async def run_negotiation(node, task_id: str, task_type: str) -> dict | None:
             payload={
                 "task_id": task_id,
                 "task_type": task_type,
-                #"in_data_sens_level": "??",
-                #"out_data_sens_level": "??"
             }
         )
 
-    #task_id = task_req.payload["task_id"]
-    #task_type = task_req.payload["task_type"]
     print(f"\n{TAG} Running negotiation for task {task_id}...")
 
     task_req_start = time()   # T1: first TASK_REQUEST sent
@@ -167,7 +175,11 @@ async def run_negotiation(node, task_id: str, task_type: str) -> dict | None:
         originator_lan=node.lan,
         payload={
             "task_id": task_id,
-            "task_type": task_type
+            "task_type": task_type,
+            "in_data_privacy_lvl": in_data_privacy_lvl,
+            "out_data_privacy_lvl": out_data_privacy_lvl,
+            "task_priority": task_priority,
+            #TODO: what to do if the data is on the target node already and nothing needs to be sent? Or should we skip that option?
         }
     )   
     
@@ -277,7 +289,11 @@ async def start(node):
     task_cycle = itertools.cycle(TASK_TYPES)    # NOTE: just for now, for testing.
 
     while True:
-        task_type, task_id, retry_attempt = await next_task(node, task_cycle)
+        task_type, task_id, \
+        in_data_privacy_lvl, \
+        out_data_privacy_lvl, \
+        task_priority, \
+        retry_attempt = await next_task(node, task_cycle)
 
         if not node.peers:
             print(f"{TAG} No peers currently available. Wating for peers to join...")
@@ -289,7 +305,9 @@ async def start(node):
         print(f"{TAG} {'='*52}")
 
 
-        negotiation_results = await run_negotiation(node, task_id, task_type)
+        negotiation_results = await run_negotiation(node, task_id, task_type, 
+                                                    in_data_privacy_lvl, out_data_privacy_lvl, task_priority)
+        
         print(f"{TAG} Negotiation results: {negotiation_results}")
 
         # TODO: For getting the task result, add a loop that queries the agent to get the results

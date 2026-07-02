@@ -13,6 +13,7 @@ Run this file directly to start a node:
 
 from collections import deque
 from dataclasses import dataclass
+from datetime import time
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import task_originator
@@ -24,10 +25,12 @@ import tensorflow as tf
 from messagebus import MessageBus
 import agent
 import yaml
+from robustness_privacy_scoring import get_network_trustworthiness_score, get_device_user_type_score
 
 TAG = "[NODE]"
 CONFIG_FILE= "node_config.yaml"
 HORIZON_H = 5
+NODE_FAILURE_LOGGING_PERIOD = 7  # days
 
 
 @dataclass
@@ -39,7 +42,8 @@ class Message:
 
 
 class Node:
-    def __init__(self, node_id: str, lan: str, nats_url: str, lstm_model_path: str, llm_model_path: str):
+    def __init__(self, node_id: str, lan: str, nats_url: str, lstm_model_path: str, llm_model_path: str,
+                 device_user_category: str, network_type: str, restarts: list = []):
         self.id = node_id
         self.lan = lan
         self.peers = []  # tuple: ("lan": str, "node_id": node_id, "ip": str|None)
@@ -51,16 +55,27 @@ class Node:
         print(f"{TAG} LSTM ready  window={self.window_len}")
 
         self.resource_history = deque(maxlen=self.window_len)
+
+        network_trust_score = get_network_trustworthiness_score(network_type)
+        device_user_type_score = get_device_user_type_score(device_user_category)
+
+        # Record the number of node failures based on the restart timestamps
+        # The very first restart timestamp is not counted as a failure, since it's the initial start of the node.
+        node_failures = len(restarts)-1 if restarts else 0
+
         self.state = dict(score=0.5, risk="MEDIUM",
-                   reputation=0.5, reliability=0.6, cpu=0.0, mem=0.0, disk=0.0,
-                   cpu_pred=0.5, mem_pred=0.5, disk_pred=0.5, lstm_ready=False,
-                   horizon=[[0.5,0.5,0.5]]*HORIZON_H, is_busy=False,
-                   tasks_completed=0)
+                   reputation=0.5, reliability=0.6, 
+                   cpu=0.0, mem=0.0, disk=0.0,
+                   cpu_pred=0.5, mem_pred=0.5, disk_pred=0.5, 
+                   lstm_ready=False,
+                   horizon=[[0.5,0.5,0.5]]*HORIZON_H, 
+                   is_busy=False, 
+                   tasks_completed=0, tasks_assigned=0, #NOTE: high_privacy_tasks_completed=0,
+                   network_trust_score=network_trust_score, usr_type_score=device_user_type_score,
+                   node_failures=node_failures,)
         
         self.task_cache = []
         self.task_queue = deque()
-
-        self.task_threads_and_results = [dict] # --> [{"task_id": tid, "thread": thread, "result": result}, {...}]
 
         print(f"{TAG} Loading LLM ...")
         self.llm_tok = AutoTokenizer.from_pretrained(llm_model_path, local_files_only=True)
@@ -120,12 +135,32 @@ if __name__ == "__main__":
         except yaml.YAMLError as exc:
             print(exc)
 
+    # Record the time of new node restart
+    new_restart_time = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+    # Remove restart timestamps older than 7 days
+    print(f"{TAG} Remove restart timestamps older than {NODE_FAILURE_LOGGING_PERIOD} days...")
+    for old_restart_time in config.get("restart-times", []):
+        if new_restart_time - old_restart_time > NODE_FAILURE_LOGGING_PERIOD * 24 * 60 * 60:
+            config["restart-times"].pop(0)
+
+    # Add the new restart timestamp to the list
+    config["restart-times"].append(new_restart_time)
+
     node = Node(node_id = config["nid"], 
                 lan = config["lan"], 
                 nats_url = config["nats-url"],
                 lstm_model_path = config["lstm-model"],
-                llm_model_path = config["llm-model"])
+                llm_model_path = config["llm-model"],
+                device_user_category = config.get("device-user-category", "public"),
+                network_type = config.get("network-type", "public-network"),
+                restarts=config.get("restart-times", []))
 
+    # Write the updated configuration back to the YAML file
+    with open(CONFIG_FILE, 'w') as outfile:
+        yaml.dump(config, outfile, default_flow_style=False)
+
+    # Run the node
     try:
         agent.register(node)    # Register message handlers for NATS communication
         asyncio.run(node.start())

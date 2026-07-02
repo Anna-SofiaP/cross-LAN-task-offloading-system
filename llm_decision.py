@@ -6,18 +6,29 @@ import torch
 ACCEPT_SCORE_MIN = 0.50
 TAG = "[LLM]"
 
-# TODO: Modify these task profiles to fit the privacy implementation and the privacy and
-# trustworthiness levels.
-
 TASK_PROFILES = {
     "CLASSIFICATION": ("moderate CPU", "low memory",      "ML classification"),
     "CV_INFERENCE":   ("high CPU",     "moderate memory", "computer vision"),
     "TIMESERIES":     ("moderate CPU", "moderate memory", "time-series LSTM"),
-    "PRIVATE_TASK":   ("moderate CPU", "moderate memory", "general compute"),   # NOTE. GENERIC
+    "GENERIC":        ("moderate CPU", "moderate memory", "general compute"),
+}
+
+TASK_DATA_PRIVACY_REQUIREMENTS = {
+    "PUBLIC":       ("low privacy level", "moderate privacy level"),
+    "INTERNAL":     ("moderate privacy level", "high privacy level"),
+    "CONFIDENTIAL": ("high privacy level", "high privacy level"),
+    "RESTRICTED":   ("high privacy level", "high privacy level"),
+}
+
+TASK_PRIORITY_REQUIREMENTS = {
+    "LOW":          ("low reliability level"),
+    "MEDIUM":       ("moderate reliability level"),
+    "HIGH":         ("high reliability level"),
 }
 
 
-def local_llm_decide(state: dict, node_id: str, llm_tok, llm_mdl, task_type: str) -> dict:
+def local_llm_decide(state: dict, node_id: str, llm_tok, llm_mdl, task_type: str, reliability_level: str, privacy_level: str,
+                                    in_data_privacy_lvl: str, out_data_privacy_lvl: str, task_priority: str) -> dict:
     print(f"{TAG} Running LLM decision for task of type {task_type}")
 
     cpu   = state["cpu"]      * 100
@@ -31,10 +42,14 @@ def local_llm_decide(state: dict, node_id: str, llm_tok, llm_mdl, task_type: str
     rel   = state["reliability"]
     done  = state.get("tasks_completed", 0)
 
-    def lvl(v, lo, hi): 
-        return "high" if v>hi else ("moderate" if v>lo else "low")
+    def lvl(value, low, high): 
+        return "high" if value>high else ("moderate" if value>low else "low")
 
-    cpu_need, mem_need, desc = TASK_PROFILES.get(task_type)
+    cpu_need, mem_need, desc = TASK_PROFILES.get(task_type, "GENERIC")
+    min_in_privacy_lvl, max_in_privacy_lvl = TASK_DATA_PRIVACY_REQUIREMENTS.get(in_data_privacy_lvl, "CONFIDENTIAL")
+    #min_out_privacy_lvl, max_out_privacy_lvl = TASK_DATA_PRIVACY_REQUIREMENTS.get(out_data_privacy_lvl, "PUBLIC")
+    reliability_requirement = TASK_PRIORITY_REQUIREMENTS.get(task_priority, "MEDIUM")
+
 
     horizon = state.get("horizon", [])
     cpu_trend = mem_trend = "stable"
@@ -44,9 +59,10 @@ def local_llm_decide(state: dict, node_id: str, llm_tok, llm_mdl, task_type: str
         mem_trend = ("rising"  if horizon[-1][1]>horizon[0][1]+0.03 else
                      "falling" if horizon[-1][1]<horizon[0][1]-0.03 else "stable")
 
+    # TODO: think about this more...
     hard_reject = (score < ACCEPT_SCORE_MIN or risk=="CRITICAL"
                    or state.get("is_busy", False))
-
+    
     # Build decision word SEPARATELY -- no nested f-string
     dw   = "REJECT" if hard_reject else "ACCEPT"
     rule = ("REJECT: score below threshold, CRITICAL risk, or node busy."
@@ -54,14 +70,14 @@ def local_llm_decide(state: dict, node_id: str, llm_tok, llm_mdl, task_type: str
             "ACCEPT: all thresholds met, node is available.")
 
     # JSON template as plain string concatenation
-    json_tmpl = '{"decision": "' + dw + '", "reason": "<one sentence>"}'
+    json_tmpl = '{"decision": "' + dw + '", "reason": "<three sentences>"}'
 
     # Compute what makes this node specifically suitable or not
     cpu_gap   = cpu_p - cpu          # positive = CPU rising
     mem_gap   = mem_p - mem          # positive = memory rising
     score_gap = score - ACCEPT_SCORE_MIN
 
-    # Task-specific fit assessment
+    # Task type-specific fit assessment
     if task_type == "CV_INFERENCE":
         fit_note = (f"CV_INFERENCE needs high CPU; current CPU={cpu:.1f}% "
                     f"predicted {cpu_p:.1f}% ({cpu_trend})")
@@ -74,16 +90,42 @@ def local_llm_decide(state: dict, node_id: str, llm_tok, llm_mdl, task_type: str
     else:
         fit_note = f"CPU={cpu:.1f}%, mem={mem:.1f}%, score={score:.4f}"
 
+    # Task data privacy fit assessment
+    privacy_fit_note = (f"Task requires AT LEAST {min_in_privacy_lvl} privacy level, "
+                        f"and at most {max_in_privacy_lvl} privacy level; "
+                        f"Node privacy level is {privacy_level} ")
+    
+    # Task priority fit assessment
+    priority_fit_note = (f"Task with priority {task_priority} requires {reliability_requirement}; "
+                         f"Node reliability level is {reliability_level}")
+
+#    system_msg = (
+#        "You are a concise edge-AI node policy engine. "
+#        "Write exactly ONE sentence as the reason. "
+#        "The sentence MUST: "
+#        "(1) start with the task type name (e.g. 'CLASSIFICATION requires...'), "
+#        "(2) include at least two specific numbers from the node state, "
+#        "(3) explain the concrete fit or mismatch -- not just 'meets threshold'. "
+#        "BAD example: 'All metrics meet requirements.' "
+#        "GOOD example: 'CLASSIFICATION requires moderate CPU and this node shows "
+#        "only 3.1% CPU (stable trend) with score 0.7205, well above the 0.5 threshold.' "
+#        "Never start with I. Never be vague."
+#    )
+
     system_msg = (
         "You are a concise edge-AI node policy engine. "
-        "Write exactly ONE sentence as the reason. "
-        "The sentence MUST: "
-        "(1) start with the task type name (e.g. 'CLASSIFICATION requires...'), "
-        "(2) include at least two specific numbers from the node state, "
-        "(3) explain the concrete fit or mismatch -- not just 'meets threshold'. "
+        "Write exactly THREE sentences as the reason. "
+        "The reason MUST: "
+        "(1) start with the task type name (e.g. 'CLASSIFICATION requires...') and information about the node's state, "
+        "(2) continue with the privacy level of the node and the privacy requirement of the task,"
+        "(3) conclude with the reliability level of the node and the reliability requirement of the task,"
+        "(4) include at least two specific numbers from the node state, "
+        "(5) explain the concrete fit or mismatch -- not just 'meets threshold'. "
         "BAD example: 'All metrics meet requirements.' "
         "GOOD example: 'CLASSIFICATION requires moderate CPU and this node shows "
-        "only 3.1% CPU (stable trend) with score 0.7205, well above the 0.5 threshold.' "
+        "only 3.1% CPU (stable trend) with score 0.7205, well above the 0.5 threshold. "
+        "The node's privacy level is moderate, which meets the task's requirement of at least moderate privacy. "
+        "The node's reliability level is high, which exceeds the task's requirement of medium reliability.' "
         "Never start with I. Never be vague."
     )
 
@@ -99,8 +141,10 @@ def local_llm_decide(state: dict, node_id: str, llm_tok, llm_mdl, task_type: str
         f"  Risk={risk}  Rep={rep:.3f}  Rel={rel:.3f}\n"
         f"  Tasks completed={done}\n\n"
         f"Fit assessment: {fit_note}\n"
+        f"Privacy assessment: {privacy_fit_note}\n"
+        f"Reliability assessment: {priority_fit_note}\n"
         f"Decision: {rule}\n\n"
-        f"Write the reason sentence — cite the specific numbers above.\n"
+        f"Write the reason sentences — cite the specific numbers and information above.\n"
         f"Respond with ONLY this JSON:\n{json_tmpl}"
     )
 
