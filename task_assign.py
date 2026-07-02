@@ -44,7 +44,8 @@ async def assign_task(node, winner_id: str, task_id: str, task_type: str) -> boo
         payload={
             "task_id": task_id,
             "task_type": task_type,
-            "winner_id": winner_id
+            "winner_id": winner_id,
+            "data": "Can be e.g. a string, file, image, audio..."
         })
     
     # Assign task to winner node and get executed task result back
@@ -59,7 +60,7 @@ async def assign_task(node, winner_id: str, task_id: str, task_type: str) -> boo
                 ack = await node.bus.local_request((lan, winner_id, ip), task_assign)
 
             if ack.type == "ack":
-                print(f"{TAG} Task assigned to and executed on node {winner_id}.")
+                print(f"{TAG} Task assigned to node {winner_id}.")
     except Exception as e:
         print(f"{TAG} task assignment error: {e}")
         return False
