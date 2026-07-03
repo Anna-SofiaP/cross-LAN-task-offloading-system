@@ -137,6 +137,8 @@ def get_reliability_level(node, node_state: dict, lan: str) -> str:
         if bounds["min"] <= combined_score <= bounds["max"]:
             reliability_level = level
             break
+
+    print(f"{TAG} Reliability level: {reliability_level}")
  
     return reliability_level
 
@@ -155,5 +157,7 @@ def get_privacy_level(node_state: dict) -> str:
         if bounds["min"] <= combined_score <= bounds["max"]:
             privacy_level = level
             break
+
+    print(f"{TAG} Privacy level: {privacy_level}")
 
     return privacy_level
