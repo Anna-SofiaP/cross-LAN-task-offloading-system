@@ -35,6 +35,11 @@ async def next_task(node, task_cycle) -> tuple[str, str, int]:
     out_data_privacy_level = random.choice(DATA_PRIVACY_LEVELS)
     task_priority = random.choice(TASK_PRIORITY_LEVELS)
 
+# NOTE: Test this later!
+#    in_data_privacy_level = input("Enter input data privacy level (PUBLIC, INTERNAL, CONFIDENTIAL, RESTRICTED): ")
+#    out_data_privacy_level = input("Enter output data privacy level (PUBLIC, INTERNAL, CONFIDENTIAL, RESTRICTED): ")
+#    task_priority = input("Enter task priority (HIGH, MEDIUM, LOW): ")
+
     if node.task_queue:
         task_type, task_id, in_data_privacy_lvl, out_data_privacy_lvl, t_priority, attempts = node.task_queue.pop()
         print(f"[ORIG] Retrying deferred task: {task_id} of type {task_type} (attempt {attempts+1})")
