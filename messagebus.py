@@ -124,7 +124,7 @@ class MessageBus:
 
     async def publish_heartbeat(self, lan: str):
         """Broadcast a heartbeat to the whole cluster via NATS."""
-        print(f"{TAG} Publishing heartbeat signal...\n")
+        #print(f"{TAG} Publishing heartbeat signal...\n")
         if self.nc is None:
             return
         await self.nc.publish(TOPIC_HEARTBEAT, json.dumps({
@@ -207,9 +207,9 @@ class MessageBus:
         else:
             for peer in self.peers:
                 if peer["node_id"] == node_id:
-                    print(f"{TAG} Peer {node_id} last seen: {peer["last_seen"]}")
+                    #print(f"{TAG} Peer {node_id} last seen: {peer["last_seen"]}")
                     peer["last_seen"] = last_seen
-                    print(f"{TAG} Peer {node_id} new discovery time: {peer["last_seen"]}")
+                    #print(f"{TAG} Peer {node_id} new discovery time: {peer["last_seen"]}")
                     break
 
 
