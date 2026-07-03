@@ -109,7 +109,7 @@ class MessageBus:
 
     # TODO: merge global_request and local_request to one request function? And do decision about messaging there!
     # NOTE: Here you can change the timeout!!!!!!
-    async def global_request(self, to: tuple, msg: Message, timeout: float = 20.0) -> Message:
+    async def global_request(self, to: tuple, msg: Message, timeout: float = 30.0) -> Message:
         lan, topic, ip = to
         print(f"{TAG} Sending request to node {topic} in LAN {lan}\n")
         return await self._request_nats(topic, msg, timeout)
@@ -346,7 +346,7 @@ class MessageBus:
         handler = self._handlers.get(msg.type)
 
         if handler:
-            result = handler(self.node, msg.payload, originator_lan=msg.originator_lan)
+            result = handler(self.node, msg.payload, msg.originator_lan, msg.originator_node)
 
             if asyncio.iscoroutine(result):
                 result = await result
