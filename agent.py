@@ -1,3 +1,4 @@
+import asyncio
 import time
 from llm_decision import local_llm_decide
 from robustness_privacy_scoring import get_reliability_level, get_privacy_level
@@ -108,7 +109,8 @@ def execute_task(node, task_id: str):
 
     peer_info = next((p for p in node.peers if p[1] == node.id), None)
     # TODO: handle peer_info is None (peer not found) case
-    response = node.bus.global_request((peer_info[0], peer_info[1], peer_info[2]), task_result)
+    loop = asyncio.get_event_loop()
+    response = loop.run_until_complete(node.bus.global_request((peer_info[0], peer_info[1], peer_info[2]), task_result))
 
     if response.type == "ack":
         print(f"{TAG} Task result for {task_id} acknowledged by originator.")
