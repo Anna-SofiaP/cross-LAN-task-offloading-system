@@ -86,7 +86,7 @@ def record_task(node, task_id: str):
     node.task_cache.append({"success": 1})
 
 
-def execute_task(node, task_id: str):
+def execute_task(node, task_id: str, orig_peer_id: str):
     # Simulate task execution with a sleep
     print(f"{TAG} Executing {task_id} ...")
     time.sleep(5)
@@ -107,10 +107,9 @@ def execute_task(node, task_id: str):
                         "result": "Task execution result: successful!"
                     })
 
-    peer_info = next((p for p in node.peers if p[1] == node.id), None)
+    peer_info = next((p for p in node.peers if p[1] == orig_peer_id), None)
     # TODO: handle peer_info is None (peer not found) case
-    loop = asyncio.get_event_loop()
-    response = loop.run_until_complete(node.bus.global_request((peer_info[0], peer_info[1], peer_info[2]), task_result))
+    response = asyncio.run(node.bus.global_request((peer_info[0], peer_info[1], peer_info[2]), task_result))
 
     if response.type == "ack":
         print(f"{TAG} Task result for {task_id} acknowledged by originator.")
@@ -129,7 +128,7 @@ def handle_task_assignment(node, task_assignment: dict, originator_lan: str, ori
         node.state["is_busy"] = True
         node.state["tasks_assigned"] += 1 
 
-    Thread(target=execute_task, args=(node, task_id,), daemon=True).start()
+    Thread(target=execute_task, args=(node, task_id, originator_node), daemon=True).start()
 
     return {"type": "ack", 
             "payload": {
