@@ -4,7 +4,6 @@ import itertools
 import random
 from time import time
 import uuid
-#from monitor import task_monitor_and_failover_loop
 from lstm_scoring import load_balanced_score
 from task_assign import assign_task, enqueue_retry, record_assignment
 #from logger import log_latency
@@ -35,7 +34,7 @@ async def next_task(node, task_cycle) -> tuple[str, str, int]:
     out_data_privacy_level = random.choice(DATA_PRIVACY_LEVELS)
     task_priority = random.choice(TASK_PRIORITY_LEVELS)
 
-# NOTE: Test this later!
+# NOTE: Use these instead of random generating, when everything else is done and working!
 #    in_data_privacy_level = input("Enter input data privacy level (PUBLIC, INTERNAL, CONFIDENTIAL, RESTRICTED): ")
 #    out_data_privacy_level = input("Enter output data privacy level (PUBLIC, INTERNAL, CONFIDENTIAL, RESTRICTED): ")
 #    task_priority = input("Enter task priority (HIGH, MEDIUM, LOW): ")
@@ -51,9 +50,8 @@ async def next_task(node, task_cycle) -> tuple[str, str, int]:
 
 
 def remove_dead_node(node, peer_id: str) -> bool:
-    """Remove dead or failed node from message bus peers list and node peers list."""
+    """Remove dead or failed node from node peers list and message bus peers list."""
 
-    # Remove peer from peer list mainained by the node
     for peer in node.peers:
         if peer[1] == peer_id:
             node.peers.remove(peer)
@@ -62,7 +60,6 @@ def remove_dead_node(node, peer_id: str) -> bool:
                 f"    Known peers of messagebus: {node.bus.peers}")
             break
 
-    # Remove peer from peer list maintained by the message bus
     for peer in node.bus.peers:
         if peer["node_id"] == peer_id:
             node.bus.peers.remove(peer)
@@ -205,8 +202,6 @@ async def run_negotiation(node, task_id: str, task_type: str, in_data_privacy_lv
         peer_id = bid["node_id"]
         print(f"{i+1}. {peer_id}: raw score = {bid["score"]}, adjusted score = {bid["adj_score"]}, risk = {bid["risk"]}")
 
-    # NOTE: remove the winner info and only keep the all_bids list + task_id and latency stuff?
-    #winner = ranked[0]
     results                   = {}
     results["task_id"]        = task_id
     results["task_type"]      = task_type
@@ -231,6 +226,17 @@ async def task_monitor_and_failover_loop(node, task_id: str, task_type: str, pee
     """
     peer_id = peer["node_id"]
     node_failure = False
+    task_result = None
+
+    #task_result_req = Message(
+    #                type="task_result_request",
+    #                originator_node=node.id,
+    #                originator_lan=node.lan,
+    #                payload={
+    #                    "task_id": task_id,
+    #                    "task_type": task_type,
+    #                }
+    #            )
 
     print(f"{TAG} Failover monitoring started for {peer_id}, task {task_id}")
 
@@ -239,7 +245,18 @@ async def task_monitor_and_failover_loop(node, task_id: str, task_type: str, pee
         last_seen = peer["last_seen"]
 
         if node_id == peer_id:
-            while True:
+
+            #while node_failure == False or not task_result:
+            while node_failure == False or not task_result:
+                #peer_info = next((p for p in node.peers if p[1] == peer_id), None)
+                ## TODO: handle peer_info is None (peer not found) case, maybe remove dead node and break?
+                #task_result = await node.bus.global_request((peer_info[0], peer_info[1], peer_info[2]), task_result_req)
+                #if task_result.type == "result" and task_result.payload["task_id"] == task_result_req.payload["task_id"]:
+                #    #TODO: save task result to some variable or file
+                #    pass
+
+                task_result = next((r for r in node.task_results if r["task_id"] == task_id), None)
+
                 await asyncio.sleep(HEARTBEAT_INTERVAL)
                 now = asyncio.get_event_loop().time()
 
@@ -247,7 +264,17 @@ async def task_monitor_and_failover_loop(node, task_id: str, task_type: str, pee
                     print(f"{TAG} Peer has not been sending heartbeat signal for >={FAILOVER_TIMEOUT} seconds.")
                     remove_dead_node(node, peer_id)
                     node_failure = True
-                    break
+            
+            # Break also from the higher level for loop.
+            if node_failure == True or task_result:
+                break
+
+    if task_result:
+        print(f"{TAG} Task {task_id} completed successfully by {peer_id}. Exiting failover monitoring loop.")
+        print(f"\n{25*'='}")
+        print(f"{TAG} Task result: {task_result["result"]}")
+        print(f"{25*'='}\n")
+        return
 
     if len(node.peers) == 0:
         print(f"{TAG} No remaining peers -- re-queueing task")
@@ -274,7 +301,6 @@ async def task_monitor_and_failover_loop(node, task_id: str, task_type: str, pee
                     print(f"{TAG} Score: {candidate["score"]:.4f}")
                     #print(f"{TAG} Reason: {candidate["reason"]}")
 
-                    #winner = candidate
                     assigned = True
                     break
                 else:
@@ -314,8 +340,6 @@ async def start(node):
                                                     in_data_privacy_lvl, out_data_privacy_lvl, task_priority)
         
         print(f"{TAG} Negotiation results: {negotiation_results}")
-
-        # TODO: For getting the task result, add a loop that queries the agent to get the results
 
         if negotiation_results:
             #task_type = negotiation_results["task_type"]

@@ -2,8 +2,16 @@ import time
 from llm_decision import local_llm_decide
 from robustness_privacy_scoring import get_reliability_level, get_privacy_level
 from threading import Thread
+from dataclasses import dataclass
 
 TAG = "[AGENT]"
+
+@dataclass
+class Message:
+    type: str
+    originator_node: str
+    originator_lan: str
+    payload: dict = None
 
 
 def register(node):
@@ -11,9 +19,10 @@ def register(node):
     node.bus.on("task_request", handle_task_request)
     node.bus.on("bid_request", handle_bid_request)
     node.bus.on("task_assignment", handle_task_assignment)
+    node.bus.on("task_result", handle_task_result)
 
 
-def handle_task_request(node, task_req: dict, originator_lan: str) -> dict:
+def handle_task_request(node, task_req: dict, originator_lan: str, originator_node: str) -> dict:
     task_id = task_req.get("task_id")
     task_type = task_req.get("task_type")
 
@@ -24,7 +33,7 @@ def handle_task_request(node, task_req: dict, originator_lan: str) -> dict:
     return {"type": "ack", "payload": {}}
 
 
-def handle_bid_request(node, bid_req: dict, originator_lan: str) -> dict:
+def handle_bid_request(node, bid_req: dict, originator_lan: str, originator_node: str) -> dict:
     task_id = bid_req.get("task_id")
     task_type = bid_req.get("task_type")
     #FIXME: originator_lan = bid_req.get("originator_lan")
@@ -39,7 +48,6 @@ def handle_bid_request(node, bid_req: dict, originator_lan: str) -> dict:
     
     node_state = node.state
 
-    # TODO: Give this info to LLM!!!
     reliability_level = get_reliability_level(node, node_state, originator_lan)
     privacy_level = get_privacy_level(node_state)
     
@@ -78,6 +86,7 @@ def record_task(node, task_id: str):
 
 
 def execute_task(node, task_id: str):
+    # Simulate task execution with a sleep
     print(f"{TAG} Executing {task_id} ...")
     time.sleep(5)
 
@@ -85,14 +94,27 @@ def execute_task(node, task_id: str):
     record_task(node, task_id)
     #node.state["tasks_completed"] = len(node.task_cache)
     node.state["tasks_completed"] += 1
-    # TODO:
-    # if some task privacy constraint:
-    #   node.state["high_privacy_tasks_completed"] += 1
 
-    print(f"{TAG} Task {task_id} complete")
+    print(f"{TAG} Task {task_id} complete!")
+
+    task_result = Message(
+                    type="task_result",
+                    originator_node=node.id,
+                    originator_lan=node.lan,
+                    payload={
+                        "task_id": task_id,
+                        "result": "Task execution result: successful!"
+                    })
+
+    peer_info = next((p for p in node.peers if p[1] == node.id), None)
+    # TODO: handle peer_info is None (peer not found) case
+    response = node.bus.global_request((peer_info[0], peer_info[1], peer_info[2]), task_result)
+
+    if response.type == "ack":
+        print(f"{TAG} Task result for {task_id} acknowledged by originator.")
 
 
-def handle_task_assignment(node, task_assignment: dict, originator_lan: str) -> dict:
+def handle_task_assignment(node, task_assignment: dict, originator_lan: str, originator_node: str) -> dict:
     task_id = task_assignment.get("task_id")
     task_type = task_assignment.get("task_type")
     winner_id = task_assignment.get("winner_id")
@@ -106,6 +128,21 @@ def handle_task_assignment(node, task_assignment: dict, originator_lan: str) -> 
         node.state["tasks_assigned"] += 1 
 
     Thread(target=execute_task, args=(node, task_id,), daemon=True).start()
+
+    return {"type": "ack", 
+            "payload": {
+                "task_id": task_id
+    }}
+
+
+def handle_task_result(node, task_result: dict, originator_lan: str, originator_node: str) -> dict:
+    task_id = task_result.get("task_id")
+    #task_type = task_result.get("task_type")
+    result = task_result.get("result")
+
+    node.task_results.append({"task_id": task_id, "result": result})
+
+    print(f"{TAG} Received task result for {task_id} from node {originator_node}")
 
     return {"type": "ack", 
             "payload": {
