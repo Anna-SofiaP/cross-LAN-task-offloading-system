@@ -156,7 +156,7 @@ def local_llm_decide(state: dict, node_id: str, llm_tok, llm_mdl, task_type: str
         inputs = llm_tok(text, return_tensors="pt")
         ilen   = inputs["input_ids"].shape[1]
         with torch.no_grad():
-            out = llm_mdl.generate(**inputs, max_new_tokens=80,
+            out = llm_mdl.generate(**inputs, max_new_tokens=160,    # NOTE: previous max_new_tokens=80
                 do_sample=False, pad_token_id=llm_tok.eos_token_id)
         raw = llm_tok.decode(out[0][ilen:], skip_special_tokens=True).strip()
         print(f"{TAG} LLM raw: {raw}")
