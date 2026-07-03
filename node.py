@@ -48,7 +48,7 @@ class Node:
         self.id = node_id
         self.lan = lan
         self.peers = []  # tuple: ("lan": str, "node_id": node_id, "ip": str|None)
-        self.assigned_task_counts = {}
+        self.assigned_task_counts = {}  # NOTE: number of assigned tasks per peer?
 
         print(f"{TAG} Loading LSTM ...")
         self.lstm_model = tf.keras.models.load_model(lstm_model_path)
@@ -75,8 +75,9 @@ class Node:
                    network_trust_score=network_trust_score, usr_type_score=device_user_type_score,
                    node_failures=node_failures,)
         
-        self.task_cache = []
+        self.task_cache = []    # FIXME: put everything here: task_id, task_type_success, task_result, etc.???
         self.task_queue = deque()
+        self.task_results = []
 
         print(f"{TAG} Loading LLM ...")
         self.llm_tok = AutoTokenizer.from_pretrained(llm_model_path, local_files_only=True)
