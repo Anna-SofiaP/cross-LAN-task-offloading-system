@@ -48,19 +48,12 @@ async def assign_task(node, winner_id: str, task_id: str, task_type: str) -> boo
             "data": "Can be e.g. a string, file, image, audio..."
         })
     
-    # Assign task to winner node and get executed task result back
+    # Assign task to winner node and get acknowledgement for received task assignment
     try:
-        if task_assign.payload["task_type"] != "PRIVATE_TASK":
-            ack = await node.bus.request((lan, winner_id, ip), task_assign)
+        ack = await node.bus.request((lan, winner_id, ip), task_assign)
 
-        elif task_assign.payload["task_type"] == "PRIVATE_TASK":
-            if not ip:
-                print(f"{TAG} Skipping global node...")
-            else:
-                ack = await node.bus.local_request((lan, winner_id, ip), task_assign)
-
-            if ack.type == "ack":
-                print(f"{TAG} Task assigned to node {winner_id}.")
+        if ack.type == "ack":
+            print(f"{TAG} Task assigned to node {winner_id}.")
     except Exception as e:
         print(f"{TAG} task assignment error: {e}")
         return False

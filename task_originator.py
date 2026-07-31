@@ -76,19 +76,7 @@ async def send_task_request(node, task_req) -> list:
         acked = False
         for attempt in range(1, 4):
             try:
-                #TODO: global_request to just request, local or global sending should be decided in message bus!
-                #ack_msg = await node.bus.global_request((lan, peer_id, ip), task_req)
                 ack_msg = await node.bus.request((lan, peer_id, ip), task_req)
-#                if task_req.payload["task_type"] != "PRIVATE_TASK":
-#                    ack_msg = await node.bus.global_request((lan, peer_id, ip), task_req)
-#
-#                elif task_req.payload["task_type"] == "PRIVATE_TASK":
-#                    print(f"{TAG} Sending to: {lan}, {peer_id}, {ip}")
-#                    if not ip:
-#                        print(f"{TAG} Skipping global node...")
-#                        break
-#
-#                    ack_msg = await node.bus.local_request((lan, peer_id, ip), task_req)
 
                 if ack_msg and ack_msg.type == "ack":
                     sent.append(peer_id)
@@ -114,18 +102,7 @@ async def get_bids(node, bid_req: Message, sent_reqests: int):
     for lan, peer_id, ip in node.peers:
         bid = None
         try:
-            #bid = await node.bus.global_request((lan, peer_id, ip), bid_req)
             bid = await node.bus.request((lan, peer_id, ip), bid_req)
-#            if bid_req.payload["task_type"] != "PRIVATE_TASK":
-#                bid = await node.bus.global_request((lan, peer_id, ip), bid_req)
-#
-#            elif bid_req.payload["task_type"] == "PRIVATE_TASK":
-#                print(f"{TAG} Sending to: {lan}, {peer_id}, {ip}")
-#                if not ip:
-#                    print(f"{TAG} Skipping global node...")
-#                    continue
-#
-#                bid = await node.bus.local_request((lan, peer_id, ip), bid_req)
 
             if bid.type == "bid" and \
                 bid.payload["task_id"] == bid_req.payload["task_id"] and \
