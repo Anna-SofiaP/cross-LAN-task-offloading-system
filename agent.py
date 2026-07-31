@@ -115,11 +115,11 @@ def execute_task(node, task_id: str, orig_peer_id: str):
 
     # TODO: fixt the task result sending to the originator node!
     #NOTE: Old version: response = asyncio.run(node.bus.global_request((peer_info[0], peer_info[1], peer_info[2]), task_result))
-    #response = asyncio.run(node.bus.request((peer_info[0], peer_info[1], peer_info[2]), task_result))
+    response = asyncio.run(node.bus.request((peer_info[0], peer_info[1], peer_info[2]), task_result))
 
     print(f"{TAG} Task result for {task_id}: {task_result.payload['result']}")
-    #if response.type == "ack":
-    #    print(f"{TAG} Task result for {task_id} acknowledged by originator.")
+    if response.type == "ack":
+        print(f"{TAG} Task result for {task_id} acknowledged by originator.")
 
 
 def handle_task_assignment(node, task_assignment: dict, originator_lan: str, originator_node: str) -> dict:
