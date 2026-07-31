@@ -92,34 +92,37 @@ class MessageBus:
         self._peer_callbacks.append(callback)
 
 
-    '''
-    async def request(self, to: tuple, msg: Message, timeout: float = 3.0) -> Message:
+    async def request(self, to: tuple, msg: Message, timeout: float = 30.0) -> Message:
         """Send a message and wait for a reply. Transport chosen automatically."""
 
         lan, topic, ip = to
+
         print(f"{TAG} Sending request to node {topic} in LAN {lan}")
 
-        if self._is_local(lan) and ip is not None or msg.payload["task_type"] == "PRIVATE_TASK":
+        if self.node.lan == lan:    # If the target node is on the same LAN, use ZeroMQ for direct communication
+            if not ip:
+                return
             print(f"{TAG} Using ZeroMQ for local request")
-            await self._send_zmq(ip, msg, timeout)
+            return await self._send_zmq(ip, msg)
         else:
             print(f"{TAG} Using NATS for remote request")
-            result = await self._request_nats(topic, msg, timeout)'''
+            return await self._request_nats(topic, msg, timeout)
     
 
     # TODO: merge global_request and local_request to one request function? And do decision about messaging there!
-    # NOTE: Here you can change the timeout!!!!!!
+    '''
     async def global_request(self, to: tuple, msg: Message, timeout: float = 30.0) -> Message:
         lan, topic, ip = to
         print(f"{TAG} Sending request to node {topic} in LAN {lan}\n")
-        return await self._request_nats(topic, msg, timeout)
+        return await self._request_nats(topic, msg, timeout)'''
     
+    '''
     async def local_request(self, to: tuple, msg: Message) -> Message:
         lan, topic, ip = to
         if not ip:
             return
         print(f"{TAG} Sending request to node {topic} in LAN {lan}\n")
-        return await self._send_zmq(ip, msg)
+        return await self._send_zmq(ip, msg)'''
 
 
     async def publish_heartbeat(self, lan: str):
@@ -213,7 +216,6 @@ class MessageBus:
                     break
 
 
-    # TODO: make work!
     '''def get_available_peers(self) -> list[str]:
         """Return node IDs of all peers currently connected to the cluster."""
         return [nid for nid, info in self.peers.items()]'''
