@@ -77,7 +77,8 @@ async def send_task_request(node, task_req) -> list:
         for attempt in range(1, 4):
             try:
                 #TODO: global_request to just request, local or global sending should be decided in message bus!
-                ack_msg = await node.bus.global_request((lan, peer_id, ip), task_req)
+                #ack_msg = await node.bus.global_request((lan, peer_id, ip), task_req)
+                ack_msg = await node.bus.request((lan, peer_id, ip), task_req)
 #                if task_req.payload["task_type"] != "PRIVATE_TASK":
 #                    ack_msg = await node.bus.global_request((lan, peer_id, ip), task_req)
 #
@@ -113,7 +114,8 @@ async def get_bids(node, bid_req: Message, sent_reqests: int):
     for lan, peer_id, ip in node.peers:
         bid = None
         try:
-            bid = await node.bus.global_request((lan, peer_id, ip), bid_req)
+            #bid = await node.bus.global_request((lan, peer_id, ip), bid_req)
+            bid = await node.bus.request((lan, peer_id, ip), bid_req)
 #            if bid_req.payload["task_type"] != "PRIVATE_TASK":
 #                bid = await node.bus.global_request((lan, peer_id, ip), bid_req)
 #
@@ -125,7 +127,6 @@ async def get_bids(node, bid_req: Message, sent_reqests: int):
 #
 #                bid = await node.bus.local_request((lan, peer_id, ip), bid_req)
 
-            # NOTE: Remember that only bids with decision ACCEPT are added to the bids list!!!
             if bid.type == "bid" and \
                 bid.payload["task_id"] == bid_req.payload["task_id"] and \
                 bid.payload["decision"] == "ACCEPT":
@@ -246,7 +247,6 @@ async def task_monitor_and_failover_loop(node, task_id: str, task_type: str, pee
 
         if node_id == peer_id:
 
-            #while node_failure == False or not task_result:
             while node_failure == False or not task_result:
                 #peer_info = next((p for p in node.peers if p[1] == peer_id), None)
                 ## TODO: handle peer_info is None (peer not found) case, maybe remove dead node and break?
