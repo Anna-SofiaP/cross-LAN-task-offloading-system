@@ -51,7 +51,7 @@ async def assign_task(node, winner_id: str, task_id: str, task_type: str) -> boo
     # Assign task to winner node and get executed task result back
     try:
         if task_assign.payload["task_type"] != "PRIVATE_TASK":
-            ack = await node.bus.global_request((lan, winner_id, ip), task_assign)
+            ack = await node.bus.request((lan, winner_id, ip), task_assign)
 
         elif task_assign.payload["task_type"] == "PRIVATE_TASK":
             if not ip:
