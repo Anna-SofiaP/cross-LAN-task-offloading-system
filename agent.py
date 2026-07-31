@@ -37,7 +37,6 @@ def handle_task_request(node, task_req: dict, originator_lan: str, originator_no
 def handle_bid_request(node, bid_req: dict, originator_lan: str, originator_node: str) -> dict:
     task_id = bid_req.get("task_id")
     task_type = bid_req.get("task_type")
-    #FIXME: originator_lan = bid_req.get("originator_lan")
 
     in_data_privacy_lvl = bid_req.get("in_data_privacy_lvl")
     out_data_privacy_lvl = bid_req.get("out_data_privacy_lvl")
@@ -108,11 +107,19 @@ def execute_task(node, task_id: str, orig_peer_id: str):
                     })
 
     peer_info = next((p for p in node.peers if p[1] == orig_peer_id), None)
-    # TODO: handle peer_info is None (peer not found) case
-    response = asyncio.run(node.bus.global_request((peer_info[0], peer_info[1], peer_info[2]), task_result))
 
-    if response.type == "ack":
-        print(f"{TAG} Task result for {task_id} acknowledged by originator.")
+    if peer_info is None:
+        print(f"{TAG} Task result for {task_id} cannot be sent: originator not found.")
+        #TODO: maybe log the incident and discard the result, since the originator is no longer reachable?
+        return
+
+    # TODO: fixt the task result sending to the originator node!
+    #NOTE: Old version: response = asyncio.run(node.bus.global_request((peer_info[0], peer_info[1], peer_info[2]), task_result))
+    #response = asyncio.run(node.bus.request((peer_info[0], peer_info[1], peer_info[2]), task_result))
+
+    print(f"{TAG} Task result for {task_id}: {task_result.payload['result']}")
+    #if response.type == "ack":
+    #    print(f"{TAG} Task result for {task_id} acknowledged by originator.")
 
 
 def handle_task_assignment(node, task_assignment: dict, originator_lan: str, originator_node: str) -> dict:
