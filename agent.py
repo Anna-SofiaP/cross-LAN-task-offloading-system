@@ -138,15 +138,13 @@ def handle_task_result_request(node, task_result_req: dict, originator_lan: str,
     # Search for the task result in the completed tasks list
     task_result = next((result for result in node.completed_tasks_results 
                         if (result["task_id"] == task_id and result["originator_peer"] == originator_node)), None)
-    print(f"{TAG} Task result found: {task_result}")
-    indx = node.completed_tasks_results.index(task_result)
-    print(f"{TAG} Task result index: {indx}")
     
     if not task_result:
         print(f"{TAG} Task result for {task_id} not found.")
         return {"type": "no_result", "payload": {}}
 
-    print(f"{TAG} Found result for task {task_id}. Sending back to task originator node {originator_node}.")
+    print(f"{TAG} Found result for task {task_id}: {task_result['result']}. Sending result to task originator node {originator_node}.")
+    indx = node.completed_tasks_results.index(task_result)
     node.completed_tasks_results.pop(indx)  # Remove the result from the completed tasks list
 
     return {"type": "result", "payload": task_result["result"]}
