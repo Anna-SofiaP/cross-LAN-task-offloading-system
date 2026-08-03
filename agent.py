@@ -129,6 +129,7 @@ async def execute_task(node, task_id: str, task_type: str, orig_peer_id: str):
         print(f"{TAG} Task result for {task_id} acknowledged by originator.\n")
 
 
+'''
 def task_exec_sync_wrapper(node, task_id: str, task_type: str, originator_node: str):
     """Wrapper to run the async execute_task function in a synchronous context."""
     loop = asyncio.new_event_loop()
@@ -137,10 +138,10 @@ def task_exec_sync_wrapper(node, task_id: str, task_type: str, originator_node: 
     try:
         loop.run_until_complete(execute_task(node, task_id, task_type, originator_node))
     finally:
-        loop.close()
+        loop.close()'''
 
 
-def handle_task_assignment(node, task_assignment: dict, originator_lan: str, originator_node: str) -> dict:
+async def handle_task_assignment(node, task_assignment: dict, originator_lan: str, originator_node: str) -> dict:
     task_id = task_assignment.get("task_id")
     task_type = task_assignment.get("task_type")
     winner_id = task_assignment.get("winner_id")
@@ -153,7 +154,8 @@ def handle_task_assignment(node, task_assignment: dict, originator_lan: str, ori
         node.state["is_busy"] = True
         node.state["tasks_assigned"] += 1 
 
-    Thread(target=task_exec_sync_wrapper, args=(node, task_id, task_type, originator_node), daemon=True).start()
+    #Thread(target=task_exec_sync_wrapper, args=(node, task_id, task_type, originator_node), daemon=True).start()
+    asyncio.create_task(execute_task(node, task_id, task_type, originator_node))
 
     return {"type": "ack", 
             "payload": {
@@ -161,7 +163,7 @@ def handle_task_assignment(node, task_assignment: dict, originator_lan: str, ori
     }}
 
 
-async def handle_task_result(node, task_result: dict, originator_lan: str, originator_node: str) -> dict:
+def handle_task_result(node, task_result: dict, originator_lan: str, originator_node: str) -> dict:
     task_id = task_result.get("task_id")
     #task_type = task_result.get("task_type")
     result = task_result.get("result")
