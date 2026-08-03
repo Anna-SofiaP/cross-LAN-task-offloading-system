@@ -161,7 +161,7 @@ def handle_task_assignment(node, task_assignment: dict, originator_lan: str, ori
     }}
 
 
-def handle_task_result(node, task_result: dict, originator_lan: str, originator_node: str) -> dict:
+async def handle_task_result(node, task_result: dict, originator_lan: str, originator_node: str) -> dict:
     task_id = task_result.get("task_id")
     #task_type = task_result.get("task_type")
     result = task_result.get("result")
