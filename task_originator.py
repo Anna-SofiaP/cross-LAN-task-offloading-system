@@ -233,7 +233,7 @@ async def task_monitor_and_failover_loop(node, task_id: str, task_type: str, pee
             break
 
         try:
-            response = node.bus.request((lan, p_id, ip), task_result_req)
+            response = await node.bus.request((lan, p_id, ip), task_result_req)
 
             if response.payload is not None:
                 task_result = response.payload
