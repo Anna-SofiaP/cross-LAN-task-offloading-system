@@ -77,7 +77,7 @@ class Node:
         
         self.task_cache = []    # FIXME: put everything here: task_id, task_type_success, task_result, etc.???
         self.task_queue = deque()
-        self.task_results = []
+        self.completed_tasks_results = []
 
         print(f"{TAG} Loading LLM ...")
         self.llm_tok = AutoTokenizer.from_pretrained(llm_model_path, local_files_only=True)
@@ -168,9 +168,8 @@ if __name__ == "__main__":
     with open(CONFIG_FILE, 'w') as outfile:
         yaml.dump(config, outfile, default_flow_style=False, indent=4)
 
-    # Run the node
     try:
-        agent.register(node)    # Register message handlers for NATS communication
-        asyncio.run(node.start())
+        agent.register(node)        # Register message handlers for NATS communication
+        asyncio.run(node.start())   # Run the node
     except KeyboardInterrupt:
         print(f"\n{TAG} Node {config["nid"]} shutting down.")
