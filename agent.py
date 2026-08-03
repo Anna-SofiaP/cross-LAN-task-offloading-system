@@ -81,25 +81,28 @@ def handle_bid_request(node, bid_req: dict, originator_lan: str, originator_node
     return bid
 
 
-def record_task(node, task_id: str):
-    node.task_cache.append({"success": 1})
-
-
-async def send_task_result(node, peer_info: tuple, task_result: Message):
-    return await node.bus.request((peer_info[0], peer_info[1], peer_info[2]), task_result)
-
-
-def execute_task(node, task_id: str, orig_peer_id: str):
-    # Simulate task execution with a sleep
-    print(f"{TAG} Executing {task_id} ...")
-    time.sleep(5)
-
+async def mark_task_completed(node, task_id: str):
+    """Mark a task as completed and update the node's state accordingly."""
     node.state["is_busy"] = False
-    record_task(node, task_id)
-    #node.state["tasks_completed"] = len(node.task_cache)
     node.state["tasks_completed"] += 1
 
+    node.task_cache.append({"success": 1})
+
     print(f"{TAG} Task {task_id} complete!")
+
+'''
+async def send_task_result(node, peer_info: tuple, task_result: Message):
+    return await node.bus.request((peer_info[0], peer_info[1], peer_info[2]), task_result)
+'''
+
+
+async def execute_task(node, task_id: str, task_type: str, orig_peer_id: str):
+    '''Execute the task and send the result back to the originator node. Task execution is simulated with a sleep.'''
+
+    print(f"{TAG} Executing {task_id} ...")
+    await asyncio.sleep(5)
+
+    await mark_task_completed(node, task_id)
 
     task_result = Message(
                     type="task_result",
@@ -117,16 +120,16 @@ def execute_task(node, task_id: str, orig_peer_id: str):
         #TODO: maybe log the incident and discard the result, since the originator is no longer reachable?
         return
 
-    # TODO: fixt the task result sending to the originator node!
-    #NOTE: Old version: response = asyncio.run(node.bus.global_request((peer_info[0], peer_info[1], peer_info[2]), task_result))
-    response = asyncio.run(send_task_result(node, peer_info, task_result))
+    # FIXME: fix the task result sending to the originator node!
+    #response = asyncio.run(send_task_result(node, peer_info, task_result))
+    response = await node.bus.request((peer_info[0], peer_info[1], peer_info[2]), task_result)
 
     print(f"{TAG} Task result for {task_id}: {task_result.payload['result']}")
     if response.type == "ack":
-        print(f"{TAG} Task result for {task_id} acknowledged by originator.")
+        print(f"{TAG} Task result for {task_id} acknowledged by originator.\n")
 
 
-def handle_task_assignment(node, task_assignment: dict, originator_lan: str, originator_node: str) -> dict:
+async def handle_task_assignment(node, task_assignment: dict, originator_lan: str, originator_node: str) -> dict:
     task_id = task_assignment.get("task_id")
     task_type = task_assignment.get("task_type")
     winner_id = task_assignment.get("winner_id")
@@ -139,7 +142,11 @@ def handle_task_assignment(node, task_assignment: dict, originator_lan: str, ori
         node.state["is_busy"] = True
         node.state["tasks_assigned"] += 1 
 
-    Thread(target=execute_task, args=(node, task_id, originator_node), daemon=True).start()
+    #Thread(target=execute_task, args=(node, task_id, originator_node), daemon=True).start()
+    try:
+        await asyncio.to_thread(execute_task, node, task_id, task_type, originator_node)
+    except ValueError as e:
+        print(f"{TAG} Error executing task {task_id}: {e}")
 
     return {"type": "ack", 
             "payload": {
