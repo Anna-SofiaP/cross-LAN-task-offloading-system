@@ -144,7 +144,7 @@ def handle_task_result_request(node, task_result_req: dict, originator_lan: str,
     
     if not task_result:
         print(f"{TAG} Task result for {task_id} not found.")
-        return {"type": "result", "payload": None}
+        return {"type": "no_result", "payload": {}}
 
     print(f"{TAG} Found result for task {task_id}. Sending back to task originator node {originator_node}.")
     node.completed_tasks_results.pop(indx)  # Remove the result from the completed tasks list

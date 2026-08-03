@@ -235,7 +235,7 @@ async def task_monitor_and_failover_loop(node, task_id: str, task_type: str, pee
         try:
             response = await node.bus.request((lan, p_id, ip), task_result_req)
 
-            if response.payload is not None:
+            if response.type == "result":
                 task_result = response.payload
                 #NOTE: save task result to some variable or file?
                 print(f"{TAG} Task {task_id} completed successfully by {peer_id}.")
