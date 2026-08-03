@@ -205,53 +205,61 @@ async def task_monitor_and_failover_loop(node, task_id: str, task_type: str, pee
     peer_id = peer["node_id"]
     node_failure = False
     task_result = None
+    result_request_attempts = 0
 
-    #task_result_req = Message(
-    #                type="task_result_request",
-    #                originator_node=node.id,
-    #                originator_lan=node.lan,
-    #                payload={
-    #                    "task_id": task_id,
-    #                    "task_type": task_type,
-    #                }
-    #            )
+    task_result_req = Message(
+                    type="task_result_request",
+                    originator_node=node.id,
+                    originator_lan=node.lan,
+                    payload={
+                        "task_id": task_id,
+                        "task_type": task_type,
+                    }
+                )
 
     print(f"{TAG} Failover monitoring started for {peer_id}, task {task_id}")
 
-    for peer in node.bus.peers:
-        node_id = peer["node_id"]
-        last_seen = peer["last_seen"]
+    # Get communication and last seen information about the peer
+    peer_info = next((peer for peer in node.peers if peer[1] == peer_id), None)
+    peer_last_seen = next((p["last_seen"] for p in node.bus.peers if p["node_id"] == peer_id), None)
+    lan, p_id, ip = peer_info if peer_info else (None, None, None)
 
-        if node_id == peer_id:
+    while node_failure == False or not task_result:
 
-            while node_failure == False or not task_result:
-                #peer_info = next((p for p in node.peers if p[1] == peer_id), None)
-                ## TODO: handle peer_info is None (peer not found) case, maybe remove dead node and break?
-                #task_result = await node.bus.global_request((peer_info[0], peer_info[1], peer_info[2]), task_result_req)
-                #if task_result.type == "result" and task_result.payload["task_id"] == task_result_req.payload["task_id"]:
-                #    #TODO: save task result to some variable or file
-                #    pass
+        if not peer_info:
+            print(f"{TAG} Peer {peer_id} not found in peers list -- re-negotiating task assignment")
+            # Peer not found in peers list can be due to many reasons, not only peer failure.
+            node_failure = True
+            break
 
-                task_result = next((r for r in node.task_results if r["task_id"] == task_id), None)
+        try:
+            response = node.bus.request((lan, p_id, ip), task_result_req)
 
-                await asyncio.sleep(HEARTBEAT_INTERVAL)
-                now = asyncio.get_event_loop().time()
+            if response.payload is not None:
+                task_result = response.payload
+                #NOTE: save task result to some variable or file?
+                print(f"{TAG} Task {task_id} completed successfully by {peer_id}.")
+                print(f"\n{25*'='}")
+                print(f"{TAG} Task result: {task_result["result"]}")
+                print(f"{25*'='}\n")
+                print(f"{TAG} Exiting failover monitoring for task {task_id}")
+                return
 
-                if now - last_seen > FAILOVER_TIMEOUT:
-                    print(f"{TAG} Peer has not been sending heartbeat signal for >={FAILOVER_TIMEOUT} seconds.")
-                    remove_dead_node(node, peer_id)
-                    node_failure = True
-            
-            # Break also from the higher level for loop.
-            if node_failure == True or task_result:
-                break
+        except Exception as e:
+            print(f"{TAG} Error in requesting task result: {e}")
+            result_request_attempts += 1
 
-    if task_result:
-        print(f"{TAG} Task {task_id} completed successfully by {peer_id}. Exiting failover monitoring loop.")
-        print(f"\n{25*'='}")
-        print(f"{TAG} Task result: {task_result["result"]}")
-        print(f"{25*'='}\n")
-        return
+        if result_request_attempts >= 3:
+            print(f"{TAG} Peer {peer_id} failed to respond after 3 attempts -- re-negotiating task assignment")
+            node_failure = True
+            break
+
+        await asyncio.sleep(HEARTBEAT_INTERVAL)
+        now = asyncio.get_event_loop().time()
+
+        if now - peer_last_seen > FAILOVER_TIMEOUT:
+            print(f"{TAG} Peer has not been sending heartbeat signal for >={FAILOVER_TIMEOUT} seconds.")
+            node_failure = True
 
     if len(node.peers) == 0:
         print(f"{TAG} No remaining peers -- re-queueing task")
@@ -260,6 +268,9 @@ async def task_monitor_and_failover_loop(node, task_id: str, task_type: str, pee
         return
 
     if node_failure:
+        # Remove the dead node from the node.peers list and message bus peers list
+        remove_dead_node(node, peer_id)
+
         # Run new negotiation with the other live peers
         print(f"{TAG} Failover with {len(node.peers)} node(s)")
         new_results = run_negotiation(node)
