@@ -107,22 +107,6 @@ class MessageBus:
         else:
             print(f"{TAG} Using NATS for remote request")
             return await self._request_nats(topic, msg, timeout)
-    
-
-    # TODO: merge global_request and local_request to one request function? And do decision about messaging there!
-    '''
-    async def global_request(self, to: tuple, msg: Message, timeout: float = 30.0) -> Message:
-        lan, topic, ip = to
-        print(f"{TAG} Sending request to node {topic} in LAN {lan}\n")
-        return await self._request_nats(topic, msg, timeout)'''
-    
-    '''
-    async def local_request(self, to: tuple, msg: Message) -> Message:
-        lan, topic, ip = to
-        if not ip:
-            return
-        print(f"{TAG} Sending request to node {topic} in LAN {lan}\n")
-        return await self._send_zmq(ip, msg)'''
 
 
     async def publish_heartbeat(self, lan: str):
