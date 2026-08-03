@@ -207,6 +207,11 @@ async def task_monitor_and_failover_loop(node, task_id: str, task_type: str, pee
     task_result = None
     result_request_attempts = 0
 
+    # Wait for some time before starting to monitor the assigned node for task completion. 
+    # This is to give the assigned node some time to execute the task.
+    #NOTE: This value can be changed to something else. Doesn't have to be the same as the HEARTBEAT_INTERVAL.
+    await asyncio.sleep(HEARTBEAT_INTERVAL)
+
     task_result_req = Message(
                     type="task_result_request",
                     originator_node=node.id,
@@ -240,7 +245,7 @@ async def task_monitor_and_failover_loop(node, task_id: str, task_type: str, pee
                 #NOTE: save task result to some variable or file?
                 print(f"{TAG} Task {task_id} completed successfully by {peer_id}.")
                 print(f"\n{25*'='}")
-                print(f"{TAG} Task result: {task_result["result"]}")
+                print(f"{TAG} Task result: {response.payload}")
                 print(f"{25*'='}\n")
                 print(f"{TAG} Exiting failover monitoring for task {task_id}")
                 return
