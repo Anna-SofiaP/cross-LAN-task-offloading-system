@@ -13,19 +13,17 @@ Run this file directly to start a node:
 
 from collections import deque
 from dataclasses import dataclass
-#from datetime import time
 import time
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import task_originator
 import monitor
-import task_assign
 import asyncio
 import tensorflow as tf
-#import argparse
 from messagebus import MessageBus
 import agent
 import yaml
+import json
 from robustness_privacy_scoring import get_network_trustworthiness_score, get_device_user_type_score
 
 TAG = "[NODE]"
@@ -34,21 +32,13 @@ HORIZON_H = 5
 NODE_FAILURE_LOGGING_PERIOD = 7  # days
 
 
-@dataclass
-class Message:
-    type: str
-    originator_node: str
-    originator_lan: str
-    payload: dict = None
-
-
 class Node:
     def __init__(self, node_id: str, lan: str, nats_url: str, lstm_model_path: str, llm_model_path: str,
-                 device_user_category: str, network_type: str, restarts: list = []):
+                 device_user_category: str, network_type: str, init_state: dict):
         self.id = node_id
         self.lan = lan
         self.peers = []  # tuple: ("lan": str, "node_id": node_id, "ip": str|None)
-        self.assigned_task_counts = {}  # NOTE: number of assigned tasks per peer?
+        self.assigned_task_counts = init_state.get("assigned-task-counts", {})  # number of tasks assigned to each peer node
 
         print(f"{TAG} Loading LSTM ...")
         self.lstm_model = tf.keras.models.load_model(lstm_model_path)
@@ -62,7 +52,7 @@ class Node:
 
         # Record the number of node failures based on the restart timestamps
         # The very first restart timestamp is not counted as a failure, since it's the initial start of the node.
-        node_failures = len(restarts)-1 if restarts else 0
+        node_failures = len(init_state.get("restart-times", []))-1
 
         self.state = dict(score=0.5, risk="MEDIUM",
                    reputation=0.5, reliability=0.6, 
@@ -71,13 +61,15 @@ class Node:
                    lstm_ready=False,
                    horizon=[[0.5,0.5,0.5]]*HORIZON_H, 
                    is_busy=False, 
-                   tasks_completed=0, tasks_assigned=0, #NOTE: high_privacy_tasks_completed=0,
-                   network_trust_score=network_trust_score, usr_type_score=device_user_type_score,
+                   tasks_completed=init_state.get("tasks-completed", 0), 
+                   tasks_assigned=init_state.get("tasks-assigned", 0),
+                   network_trust_score=network_trust_score, 
+                   usr_type_score=device_user_type_score,
                    node_failures=node_failures,)
         
-        self.task_cache = []    # FIXME: put everything here: task_id, task_type_success, task_result, etc.???
-        self.task_queue = deque()
-        self.completed_tasks_results = []
+        self.task_cache = init_state.get("task_cache", [])    # FIXME: put everything here: task_id, task_type_success, task_result, etc.???
+        self.task_queue = deque()           # TODO: should this be in state json file?
+        self.completed_tasks_results = []   # TODO: should this be in state json file?
 
         print(f"{TAG} Loading LLM ...")
         self.llm_tok = AutoTokenizer.from_pretrained(llm_model_path, local_files_only=True)
@@ -105,9 +97,9 @@ class Node:
             monitor.heartbeat_loop(self),
             monitor.metric_loop(self),
             # Task originator loop
-            #task_originator.start(self),
+            task_originator.start(self),
             # ZMQ loop
-            self.bus._zmq_listen_loop()
+            #self.bus._zmq_listen_loop()
         )
 
 
@@ -127,9 +119,27 @@ class Node:
             self.peers.append((info['lan'], node_id, None))
 
 
+    def save_node_state(self):
+        """Save the node's state to a JSON file."""
+
+        state_to_save = {
+            "restart-times": self.state.get("restart-times", []),
+            "tasks-assigned": self.state.get("tasks_assigned", 0),
+            "tasks-completed": self.state.get("tasks_completed", 0),
+            "assigned-task-counts": self.assigned_task_counts,
+            "task_cache": self.task_cache
+        }
+
+        with open("node_state.json", "w") as file:
+            json.dump(state_to_save, file)
+
+        print(f"{TAG} Stored node state to node_state.json")
+
+
 
 if __name__ == "__main__":
     config = {}
+    init_node_state = {}
 
     with open(CONFIG_FILE) as stream:
         try:
@@ -137,23 +147,34 @@ if __name__ == "__main__":
         except yaml.YAMLError as exc:
             print(exc)
 
+    with open("node_state.json", "r") as file:
+        init_node_state = json.load(file)
+
     # Record the time of new node restart
-    #new_restart_time = time.strftime(time.gmtime(), "%Y-%m-%dT%H:%M:%SZ")
     new_restart_time = time.time()
 
     # Remove restart timestamps older than 7 days
     print(f"{TAG} Remove restart timestamps older than {NODE_FAILURE_LOGGING_PERIOD} days...")
 
-    restart_times = config.get("restart-times", [])
+    restart_times = init_node_state.get("restart-times", [])
     if restart_times:
-        for old_restart_time in restart_times:
-            if new_restart_time - old_restart_time > NODE_FAILURE_LOGGING_PERIOD * 24 * 60 * 60:
-                config["restart-times"].pop(0)
-    else:
-        config["restart-times"] = []
-    
+        updated_restart_times = [old_restart_time for old_restart_time in restart_times 
+                                 if (new_restart_time - old_restart_time) <= NODE_FAILURE_LOGGING_PERIOD * 24 * 60 * 60]
+        init_node_state["restart-times"] = updated_restart_times
+
     # Add the new restart timestamp to the list
-    config["restart-times"].append(new_restart_time)
+    init_node_state["restart-times"].append(new_restart_time)
+
+    #restart_times = config.get("restart-times", [])
+    #if restart_times:
+    #    for old_restart_time in restart_times:
+    #        if new_restart_time - old_restart_time > NODE_FAILURE_LOGGING_PERIOD * 24 * 60 * 60:
+    #            config["restart-times"].pop(0)
+    #else:
+    #    config["restart-times"] = []
+    #
+    ## Add the new restart timestamp to the list
+    #config["restart-times"].append(new_restart_time)
 
     node = Node(node_id = config["nid"], 
                 lan = config["lan"], 
@@ -162,14 +183,20 @@ if __name__ == "__main__":
                 llm_model_path = config["llm-model"],
                 device_user_category = config.get("device-user-category", "public"),
                 network_type = config.get("network-type", "public-network"),
-                restarts=config.get("restart-times", []))
+                init_state=init_node_state)
 
     # Write the updated configuration back to the YAML file
-    with open(CONFIG_FILE, 'w') as outfile:
-        yaml.dump(config, outfile, default_flow_style=False, indent=4)
+    #with open(CONFIG_FILE, 'w') as outfile:
+    #    yaml.dump(config, outfile, default_flow_style=False, indent=4)
+
+    # Write the updated node state back to the JSON file
+    with open("node_state.json", "w") as file:
+        json.dump(init_node_state, file)
 
     try:
-        agent.register(node)        # Register message handlers for NATS communication
+        #agent.register(node)       # Register message handlers for NATS communication
         asyncio.run(node.start())   # Run the node
     except KeyboardInterrupt:
         print(f"\n{TAG} Node {config["nid"]} shutting down.")
+    finally:
+        node.save_node_state()       # Save the node's state to a JSON file
