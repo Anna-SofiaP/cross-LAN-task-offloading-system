@@ -57,8 +57,8 @@ async def metric_loop(node: Node):
 
         #rep = compute_rep(node.task_cache)
         #rel = compute_rel(node.task_cache)
-        rep = compute_rep(node.tasks_assigned, node.tasks_completed)
-        rel = compute_rel(node.tasks_assigned, node.tasks_completed)
+        rep = compute_rep(node.state.tasks_assigned, node.state.tasks_completed)
+        rel = compute_rel(node.state.tasks_assigned, node.state.tasks_completed)
         score = compute_score(preds.tolist(), rep, rel)
         risk  = risk_level(score)
 
