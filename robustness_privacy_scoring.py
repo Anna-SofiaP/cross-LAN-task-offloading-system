@@ -2,10 +2,9 @@
 # Reliability and privacy scoring
 This module is for defining the different robustness/reliability, trustworthiness, 
 accessibility and privacy scoring systems and levels that are used in the task 
-allocation process. Each node it put on some level in each three different categories: 
+allocation process. Each node it put on some level in either of the two different categories: 
 - node reliability
 - node privacy
-- network trustworthiness and accessibility
 
 ## Categorizing the nodes
 
@@ -29,7 +28,8 @@ the `max` values of that level.
 
 ## About forming of the levels
 The maximum and minimum values of the levels have been calculated and formulated roughly,
-by...
+by taking into account the different scores that are multiplied together to form the final score.
+...
 """
 
 TAG = "[LEVELS]"
@@ -58,11 +58,6 @@ RELIABILITY_LEVELS = {
                     }
 
 # Privacy --------------------------------------------------------------------------
-#PRIVACY_TASK_EXEC_SCORE = [(0.9, 1.0, 1.0),     # (min_value, max_value, score)
-#                           (0.7, 0.9, 0.8), 
-#                           (0.5, 0.7, 0.6), 
-#                           (0.0, 0.5, 0.4)]
-
 DEVICE_USER_TYPE_SCORE = [("business", 1.0), 
                    ("personal", 0.8), 
                    ("public", 0.4)]
