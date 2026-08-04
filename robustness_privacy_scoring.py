@@ -125,6 +125,8 @@ def get_reliability_level(node, node_state: dict, lan: str) -> str:
 
     combined_score = task_assignment_success_score * node_failure_score * node_access_score
 
+    print(f"{TAG} Combined reliability score: {combined_score}")
+
     # Determine the reliability level based on the combined score
     reliability_level = "low"
 
@@ -144,6 +146,8 @@ def get_privacy_level(node_state: dict) -> str:
     network_trust_score = node_state.get("network_trust_score")
 
     combined_score = usr_type_score * network_trust_score
+
+    print(f"{TAG} Combined privacy score: {combined_score}")
 
     # Determine the privacy level based on the combined score
     privacy_level = "low"

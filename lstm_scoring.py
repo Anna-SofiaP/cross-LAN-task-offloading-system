@@ -31,7 +31,7 @@ def compute_rep(tasks_assigned, tasks_completed):
     #c = list(node_task_cache)
     #if not c: 
     #    return 0.5
-    #s = sum(1 for t in c if t.get("success")==1) #FIXME: the task cache is not really working well now...
+    #s = sum(1 for t in c if t.get("success")==1)
     #return max(0.0, min(1.0, (s+3)/(len(c)+6)))
 
 
