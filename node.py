@@ -151,6 +151,8 @@ if __name__ == "__main__":
     with open(NODE_STATE_FILE, "r") as file:
         init_node_state = json.load(file)
 
+    print(f"{TAG} Initial node state:\n\t{init_node_state}")
+
     # Record the time of new node restart
     new_restart_time = time.time()
 
