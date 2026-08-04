@@ -8,9 +8,15 @@ from lstm_scoring import load_balanced_score
 from task_assign import assign_task, enqueue_retry, record_assignment
 #from logger import log_latency
 
+# TODO: Who decides these values for each task? Should they be configurable? Should they be based on the task type? 
+#       Should it be a human who decides or some AI?
 TASK_TYPES              = ["CLASSIFICATION", "TIMESERIES", "CV_INFERENCE"]
 DATA_PRIVACY_LEVELS     = ["PUBLIC", "INTERNAL", "CONFIDENTIAL", "RESTRICTED"]
 TASK_PRIORITY_LEVELS    = ["HIGH", "MEDIUM", "LOW"]
+# TODO: Instead of task priority levels, should we have task deadlines? 
+#       For example, a task can be "immediate", "as soon as possible", or "whenever". 
+#       This would be more flexible and specific than just having a priority level. 
+#       The node can then decide if it can complete the task within the deadline based on its current load and predicted future load.
 
 TAG                     = "[ORIG]"
 BID_TIMEOUT             = 160
@@ -120,7 +126,7 @@ async def get_bids(node, bid_req: Message, sent_reqests: int):
 
     print(f"{TAG} All bids:")
     for bid in bids:
-        print(f"Bidder {bid["node_id"]}")
+        print(f"\t{bid["node_id"]}")
 
     return bids
 
@@ -188,7 +194,6 @@ async def run_negotiation(node, task_id: str, task_type: str, in_data_privacy_lv
     results["last_bid_time"]  = last_bid_time
 
     print(f"{TAG} Selected winner: {ranked[0]["node_id"]}")
-    #print(f"{TAG} LLM reason: {winner['reason']}")
 
     print(f"{TAG} Ranking: {results}")
 
@@ -233,7 +238,7 @@ async def task_monitor_and_failover_loop(node, task_id: str, task_type: str, pee
 
         if not peer_info:
             print(f"{TAG} Peer {peer_id} not found in peers list -- re-negotiating task assignment")
-            # Peer not found in peers list can be due to many reasons, not only peer failure.
+            # NOTE: Peer not found in peers list can be due to many reasons, not only peer failure.
             node_failure = True
             break
 
@@ -242,12 +247,11 @@ async def task_monitor_and_failover_loop(node, task_id: str, task_type: str, pee
 
             if response.type == "result":
                 task_result = response.payload
-                #NOTE: save task result to some variable or file?
                 print(f"{TAG} Task {task_id} completed successfully by {peer_id}.")
                 print(f"\n{25*'='}")
-                print(f"{TAG} Task result: {response.payload}")
+                print(f"{TAG} Task result: {task_result}")
                 print(f"{25*'='}\n")
-                print(f"{TAG} Exiting failover monitoring for task {task_id}")
+                print(f"{TAG} Exiting failover monitoring")
                 return
 
         except Exception as e:
@@ -273,7 +277,7 @@ async def task_monitor_and_failover_loop(node, task_id: str, task_type: str, pee
         return
 
     if node_failure:
-        # Remove the dead node from the node.peers list and message bus peers list
+        # In case of node failure, remove the dead node from the node.peers list and message bus peers list
         remove_dead_node(node, peer_id)
 
         # Run new negotiation with the other live peers
@@ -292,7 +296,6 @@ async def task_monitor_and_failover_loop(node, task_id: str, task_type: str, pee
 
                     print(f"\n{TAG} FAILOVER -> {candidate["node_id"]}")
                     print(f"{TAG} Score: {candidate["score"]:.4f}")
-                    #print(f"{TAG} Reason: {candidate["reason"]}")
 
                     assigned = True
                     break
@@ -335,8 +338,6 @@ async def start(node):
         print(f"{TAG} Negotiation results: {negotiation_results}")
 
         if negotiation_results:
-            #task_type = negotiation_results["task_type"]
-            #winner_id = negotiation_results["node_id"]
             all_bids = negotiation_results.pop("all_bids")
             assigned = False
 
@@ -350,8 +351,6 @@ async def start(node):
                 print(f"{TAG} Assigning task to node {peer_id}...")
 
                 task_assign_time = time()   # T3: task assignment sent
-
-                await asyncio.sleep(5) # NOTE: for testing!
 
                 if await assign_task(node, peer_id, task_id, task_type):
                     record_assignment(node, peer_id)
@@ -368,7 +367,7 @@ async def start(node):
                     lat_assignment  = (t3 - t2) * 1000   # last bid  -> task assign
                     lat_total       = (t3 - t1) * 1000   # broadcast -> task assign
 
-                    # NOTE: We don't have to await this
+                    # TODO: do we have to await this?
                     #log_latency(task_type,
                     #    winner_id, negotiation_results["score"],
                     #    negotiation_results["adj_score"],
