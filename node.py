@@ -28,6 +28,7 @@ from robustness_privacy_scoring import get_network_trustworthiness_score, get_de
 
 TAG = "[NODE]"
 CONFIG_FILE= "node_config.yaml"
+NODE_STATE_FILE = "node_state.json"
 HORIZON_H = 5
 NODE_FAILURE_LOGGING_PERIOD = 7  # days
 
@@ -97,9 +98,9 @@ class Node:
             monitor.heartbeat_loop(self),
             monitor.metric_loop(self),
             # Task originator loop
-            task_originator.start(self),
+            #task_originator.start(self),
             # ZMQ loop
-            #self.bus._zmq_listen_loop()
+            self.bus._zmq_listen_loop()
         )
 
 
@@ -130,10 +131,10 @@ class Node:
             "task_cache": self.task_cache
         }
 
-        with open("node_state.json", "w") as file:
+        with open(NODE_STATE_FILE, "w") as file:
             json.dump(state_to_save, file)
 
-        print(f"{TAG} Stored node state to node_state.json")
+        print(f"{TAG} Stored node state to {NODE_STATE_FILE}")
 
 
 
@@ -147,7 +148,7 @@ if __name__ == "__main__":
         except yaml.YAMLError as exc:
             print(exc)
 
-    with open("node_state.json", "r") as file:
+    with open(NODE_STATE_FILE, "r") as file:
         init_node_state = json.load(file)
 
     # Record the time of new node restart
@@ -190,11 +191,11 @@ if __name__ == "__main__":
     #    yaml.dump(config, outfile, default_flow_style=False, indent=4)
 
     # Write the updated node state back to the JSON file
-    with open("node_state.json", "w") as file:
+    with open(NODE_STATE_FILE, "w") as file:
         json.dump(init_node_state, file)
 
     try:
-        #agent.register(node)       # Register message handlers for NATS communication
+        agent.register(node)       # Register message handlers for NATS communication
         asyncio.run(node.start())   # Run the node
     except KeyboardInterrupt:
         print(f"\n{TAG} Node {config["nid"]} shutting down.")
