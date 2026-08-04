@@ -1,8 +1,16 @@
+# Node specific information
 node_config.yaml
-.venv
-__pycache__
-lstm_system_monitor1.keras
+node_state.json
+
+# Logging
 logger.py
 scheduling_latency.csv
+
+# Models
+lstm_system_monitor1.keras
 load_and_save_llm.py
 qwen2.5_local
+
+# Others
+.venv
+__pycache__
