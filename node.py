@@ -68,7 +68,7 @@ class Node:
                    usr_type_score=device_user_type_score,
                    node_failures=node_failures,)
         
-        self.task_cache = init_state.get("task_cache", [])    # FIXME: put everything here: task_id, task_type_success, task_result, etc.???
+        #self.task_cache = init_state.get("task_cache", [])    # FIXME: put everything here: task_id, task_type_success, task_result, etc.???
         self.task_queue = deque()           # TODO: should this be in state json file?
         self.completed_tasks_results = []   # TODO: should this be in state json file?
 

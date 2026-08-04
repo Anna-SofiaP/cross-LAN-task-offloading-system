@@ -22,22 +22,31 @@ def predict_horizon(history, window_len, lstm_model):
 
 
 # ---- Scoring -------------------------------------------------------------
-def compute_rep(node_task_cache):
+#def compute_rep(node_task_cache):
+def compute_rep(tasks_assigned, tasks_completed):
     """Compute simple reputation: ratio of successful tasks, with smoothing for new nodes."""
-    c = list(node_task_cache)
-    if not c: 
+    if tasks_assigned == 0:
         return 0.5
-    s = sum(1 for t in c if t.get("success")==1) #FIXME: the task cache is not really working well now...
-    return max(0.0, min(1.0, (s+3)/(len(c)+6)))
+    return max(0.0, min(1.0, (tasks_completed + 3) / (tasks_assigned + 6)))
+    #c = list(node_task_cache)
+    #if not c: 
+    #    return 0.5
+    #s = sum(1 for t in c if t.get("success")==1) #FIXME: the task cache is not really working well now...
+    #return max(0.0, min(1.0, (s+3)/(len(c)+6)))
 
 
-def compute_rel(node_task_cache):
+#def compute_rel(node_task_cache):
+def compute_rel(tasks_assigned, tasks_completed):
     """Compute reliability: weighted recent success rate, more forgiving to new nodes."""
-    c = list(node_task_cache)
-    if len(c) < 3: 
+    if tasks_assigned < 3:
         return 0.6
-    on = sum(1 for t in c if t.get("success")==1)/len(c)
-    return max(0.0, min(1.0, 0.7*on+0.3))
+    on = tasks_completed / tasks_assigned
+    return max(0.0, min(1.0, 0.7*on + 0.3))
+    #c = list(node_task_cache)
+    #if len(c) < 3: 
+    #    return 0.6
+    #on = sum(1 for t in c if t.get("success")==1)/len(c)
+    #return max(0.0, min(1.0, 0.7*on+0.3))
 
 
 def compute_score(horizon, rep, rel):

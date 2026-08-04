@@ -55,8 +55,10 @@ async def metric_loop(node: Node):
         
         avg = preds.mean(axis=0)
 
-        rep = compute_rep(node.task_cache)
-        rel = compute_rel(node.task_cache)
+        #rep = compute_rep(node.task_cache)
+        #rel = compute_rel(node.task_cache)
+        rep = compute_rep(node.tasks_assigned, node.tasks_completed)
+        rel = compute_rel(node.tasks_assigned, node.tasks_completed)
         score = compute_score(preds.tolist(), rep, rel)
         risk  = risk_level(score)
 
@@ -65,8 +67,8 @@ async def metric_loop(node: Node):
             cpu=round(cpu/100,4), mem=round(mem/100,4), disk=round(disk/100,4),
             cpu_pred=round(float(avg[0]),4), mem_pred=round(float(avg[1]),4),
             disk_pred=round(float(avg[2]),4), lstm_ready=ready,
-            horizon=preds.tolist(), is_busy=node.state["is_busy"],
-            tasks_completed=len(node.task_cache))
+            horizon=preds.tolist(), is_busy=node.state["is_busy"],)
+            #tasks_completed=len(node.task_cache))
             
         st = "READY" if ready else f"warming {n}/{node.window_len}"
 

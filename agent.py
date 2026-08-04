@@ -86,7 +86,7 @@ def mark_task_completed(node, task_id: str):
     node.state["is_busy"] = False
     node.state["tasks_completed"] += 1
 
-    node.task_cache.append({"success": 1})
+    #node.task_cache.append({"success": 1})
 
     print(f"{TAG} Task {task_id} complete!")
 
