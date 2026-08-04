@@ -188,15 +188,13 @@ class MessageBus:
             print(f"{TAG} New peer discovered: {node_id} @ {ip}\n")
 
             for cb in self._peer_callbacks:
-                #await cb(node_id, self.peers[node_id])
                 await cb(node_id, {"ip": ip, "lan": lan})
 
         else:
             for peer in self.peers:
                 if peer["node_id"] == node_id:
-                    #print(f"{TAG} Peer {node_id} last seen: {peer["last_seen"]}")
                     peer["last_seen"] = last_seen
-                    #print(f"{TAG} Peer {node_id} new discovery time: {peer["last_seen"]}")
+                    print(f"{TAG} Peer {node_id} last seen: {peer["last_seen"]}")
                     break
 
 
@@ -252,8 +250,6 @@ class MessageBus:
 
             if node_id == self.node.id:
                 return  # ignore own heartbeat
-            
-            #print(f"{TAG} Received a heartbeat signal from a peer!\n")
             
             await self._update_peer(node_id, data["lan"], data["ip"])
         except Exception as e:
