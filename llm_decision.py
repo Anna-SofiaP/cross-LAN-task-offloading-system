@@ -19,12 +19,14 @@ TASK_DATA_PRIVACY_REQUIREMENTS = {
     "CONFIDENTIAL": ("high privacy level", "high privacy level"),
     "RESTRICTED":   ("high privacy level", "high privacy level"),
 }
+# Example: if a task requires the processing of data of level "INTERNAL", then the node must have a privacy level of at least "moderate" and at most "high" to be suitable for the task.
 
 TASK_PRIORITY_REQUIREMENTS = {
     "LOW":          ("low reliability level"),
     "MEDIUM":       ("moderate reliability level"),
     "HIGH":         ("high reliability level"),
 }
+# Example: if a task has priority "HIGH", then the node must have a reliability level of at least "high" to be suitable for the task.
 
 
 def local_llm_decide(state: dict, node_id: str, llm_tok, llm_mdl, task_type: str, reliability_level: str, privacy_level: str,
@@ -47,7 +49,7 @@ def local_llm_decide(state: dict, node_id: str, llm_tok, llm_mdl, task_type: str
 
     cpu_need, mem_need, desc = TASK_PROFILES.get(task_type, "GENERIC")
     min_in_privacy_lvl, max_in_privacy_lvl = TASK_DATA_PRIVACY_REQUIREMENTS.get(in_data_privacy_lvl, "CONFIDENTIAL")
-    #min_out_privacy_lvl, max_out_privacy_lvl = TASK_DATA_PRIVACY_REQUIREMENTS.get(out_data_privacy_lvl, "PUBLIC")
+    #TODO: min_out_privacy_lvl, max_out_privacy_lvl = TASK_DATA_PRIVACY_REQUIREMENTS.get(out_data_privacy_lvl, "PUBLIC")
     reliability_requirement = TASK_PRIORITY_REQUIREMENTS.get(task_priority, "MEDIUM")
 
 
