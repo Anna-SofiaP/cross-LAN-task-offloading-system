@@ -118,7 +118,6 @@ def handle_task_assignment(node, task_assignment: dict, originator_lan: str, ori
         node.state["is_busy"] = True
         node.state["tasks_assigned"] += 1 
 
-    #Thread(target=task_exec_sync_wrapper, args=(node, task_id, task_type, originator_node), daemon=True).start()
     Thread(target=execute_task, args=(node, task_id, task_type, originator_node), daemon=True).start()
 
     return {"type": "ack", 
@@ -144,7 +143,10 @@ def handle_task_result_request(node, task_result_req: dict, originator_lan: str,
         return {"type": "no_result", "payload": {}}
 
     print(f"{TAG} Found result for task {task_id}: {task_result['result']}. Sending result to task originator node {originator_node}.")
-    indx = node.completed_tasks_results.index(task_result)
-    node.completed_tasks_results.pop(indx)  # Remove the result from the completed tasks list
 
+    # The task and its result was found: remove the result from the completed tasks list...
+    indx = node.completed_tasks_results.index(task_result)
+    node.completed_tasks_results.pop(indx)
+
+    # ... and send the result to the task originator
     return {"type": "result", "payload": task_result["result"]}
