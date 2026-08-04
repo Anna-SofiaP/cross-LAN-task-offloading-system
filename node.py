@@ -13,6 +13,7 @@ Run this file directly to start a node:
 
 from collections import deque
 from dataclasses import dataclass
+import os
 import time
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
@@ -98,9 +99,9 @@ class Node:
             monitor.heartbeat_loop(self),
             monitor.metric_loop(self),
             # Task originator loop
-            #task_originator.start(self),
+            task_originator.start(self),
             # ZMQ loop
-            self.bus._zmq_listen_loop()
+            #self.bus._zmq_listen_loop()
         )
 
 
@@ -120,15 +121,14 @@ class Node:
             self.peers.append((info['lan'], node_id, None))
 
 
-    def save_node_state(self):
+    def save_node_state(self, restart_times: list):
         """Save the node's state to a JSON file."""
 
         state_to_save = {
-            "restart-times": self.state.get("restart-times", []),
+            "restart-times": restart_times,
             "tasks-assigned": self.state.get("tasks_assigned", 0),
             "tasks-completed": self.state.get("tasks_completed", 0),
-            "assigned-task-counts": self.assigned_task_counts,
-            "task_cache": self.task_cache
+            "assigned-task-counts": self.assigned_task_counts
         }
 
         with open(NODE_STATE_FILE, "w") as file:
@@ -148,13 +148,22 @@ if __name__ == "__main__":
         except yaml.YAMLError as exc:
             print(exc)
 
-    with open(NODE_STATE_FILE, "r") as file:
-        init_node_state = json.load(file)
+    if os.path.exists(NODE_STATE_FILE):
+        with open(NODE_STATE_FILE, "r") as file:
+            init_node_state = json.load(file)
+    else:
+        init_node_state.update({
+            "restart-times": [],
+            "tasks-assigned": 0,
+            "tasks-completed": 0,
+            "assigned-task-counts": {}
+        })
 
     print(f"{TAG} Initial node state:\n\t{init_node_state}")
 
-    # Record the time of new node restart
+    # Record the time of new node restart and add to the restart list
     new_restart_time = time.time()
+    init_node_state["restart-times"].append(new_restart_time)
 
     # Remove restart timestamps older than 7 days
     print(f"{TAG} Remove restart timestamps older than {NODE_FAILURE_LOGGING_PERIOD} days...")
@@ -165,20 +174,6 @@ if __name__ == "__main__":
                                  if (new_restart_time - old_restart_time) <= NODE_FAILURE_LOGGING_PERIOD * 24 * 60 * 60]
         init_node_state["restart-times"] = updated_restart_times
 
-    # Add the new restart timestamp to the list
-    init_node_state["restart-times"].append(new_restart_time)
-
-    #restart_times = config.get("restart-times", [])
-    #if restart_times:
-    #    for old_restart_time in restart_times:
-    #        if new_restart_time - old_restart_time > NODE_FAILURE_LOGGING_PERIOD * 24 * 60 * 60:
-    #            config["restart-times"].pop(0)
-    #else:
-    #    config["restart-times"] = []
-    #
-    ## Add the new restart timestamp to the list
-    #config["restart-times"].append(new_restart_time)
-
     node = Node(node_id = config["nid"], 
                 lan = config["lan"], 
                 nats_url = config["nats-url"],
@@ -188,18 +183,14 @@ if __name__ == "__main__":
                 network_type = config.get("network-type", "public-network"),
                 init_state=init_node_state)
 
-    # Write the updated configuration back to the YAML file
-    #with open(CONFIG_FILE, 'w') as outfile:
-    #    yaml.dump(config, outfile, default_flow_style=False, indent=4)
-
-    # Write the updated node state back to the JSON file
+    # Write the updated node state back to the JSON file (restart times list is updated)
     with open(NODE_STATE_FILE, "w") as file:
         json.dump(init_node_state, file)
 
     try:
-        agent.register(node)       # Register message handlers for NATS communication
+        #agent.register(node)       # Register message handlers for NATS communication
         asyncio.run(node.start())   # Run the node
     except KeyboardInterrupt:
         print(f"\n{TAG} Node {config["nid"]} shutting down.")
     finally:
-        node.save_node_state()       # Save the node's state to a JSON file
+        node.save_node_state(restart_times)       # Save the node's state to a JSON file
