@@ -69,9 +69,9 @@ class Node:
                    usr_type_score=device_user_type_score,
                    node_failures=node_failures,)
         
-        #self.task_cache = init_state.get("task_cache", [])    # FIXME: put everything here: task_id, task_type_success, task_result, etc.???
+        #self.task_cache = init_state.get("task_cache", [])
         self.task_queue = deque()           # TODO: should this be in state json file?
-        self.completed_tasks_results = []   # TODO: should this be in state json file?
+        self.completed_tasks_results = init_state.get("completed-tasks-results", [])
 
         print(f"{TAG} Loading LLM ...")
         self.llm_tok = AutoTokenizer.from_pretrained(llm_model_path, local_files_only=True)
@@ -99,9 +99,9 @@ class Node:
             monitor.heartbeat_loop(self),
             monitor.metric_loop(self),
             # Task originator loop
-            task_originator.start(self),
+            #task_originator.start(self),
             # ZMQ loop
-            #self.bus._zmq_listen_loop()
+            self.bus._zmq_listen_loop()
         )
 
 
@@ -128,7 +128,8 @@ class Node:
             "restart-times": restart_times,
             "tasks-assigned": self.state.get("tasks_assigned", 0),
             "tasks-completed": self.state.get("tasks_completed", 0),
-            "assigned-task-counts": self.assigned_task_counts
+            "assigned-task-counts": self.assigned_task_counts,
+            "completed-tasks-results": self.completed_tasks_results
         }
 
         with open(NODE_STATE_FILE, "w") as file:
@@ -156,7 +157,8 @@ if __name__ == "__main__":
             "restart-times": [],
             "tasks-assigned": 0,
             "tasks-completed": 0,
-            "assigned-task-counts": {}
+            "assigned-task-counts": {},
+            "completed-tasks-results": []
         })
 
     print(f"{TAG} Initial node state:\n\t{init_node_state}")
@@ -188,7 +190,7 @@ if __name__ == "__main__":
         json.dump(init_node_state, file)
 
     try:
-        #agent.register(node)       # Register message handlers for NATS communication
+        agent.register(node)       # Register message handlers for NATS communication
         asyncio.run(node.start())   # Run the node
     except KeyboardInterrupt:
         print(f"\n{TAG} Node {config["nid"]} shutting down.")
