@@ -75,7 +75,6 @@ def load_balanced_score(node, bid: dict, all_bidders: list = None) -> float:
 
     print(f"{TAG} Calculating load balanced score for peer {peer_id}, score={raw}...")
 
-    #with _assign_lock: 
     task_assign_counts = dict(node.assigned_task_counts)
 
     # Build a map of the task assignments counts for all live peers, including live nodes with 0 assignments
