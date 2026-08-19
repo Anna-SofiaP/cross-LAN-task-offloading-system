@@ -253,6 +253,9 @@ async def task_monitor_and_failover_loop(node, task_id: str, task_type: str, pee
                 print(f"{25*'='}\n")
                 print(f"{TAG} Exiting failover monitoring")
                 return
+            elif response.type == "no_result":
+                print(f"{TAG} Peer {peer_id} has not completed task {task_id} yet. Continuing to monitor...")
+                result_request_attempts = 0
 
         except Exception as e:
             print(f"{TAG} Error in requesting task result: {e}")
@@ -270,15 +273,15 @@ async def task_monitor_and_failover_loop(node, task_id: str, task_type: str, pee
             print(f"{TAG} Peer has not been sending heartbeat signal for >={FAILOVER_TIMEOUT} seconds.")
             node_failure = True
 
-    if len(node.peers) == 0:
-        print(f"{TAG} No remaining peers -- re-queueing task")
-        enqueue_retry(node, task_type, task_id, retry_attempt)
-        # No reason to run new negotiation at this point.
-        return
-
     if node_failure:
         # In case of node failure, remove the dead node from the node.peers list and message bus peers list
         remove_dead_node(node, peer_id)
+
+        if len(node.peers) == 0:
+            print(f"{TAG} No remaining peers -- re-queueing task")
+            enqueue_retry(node, task_type, task_id, retry_attempt)
+            # No reason to run new negotiation at this point.
+            return
 
         # Run new negotiation with the other live peers
         print(f"{TAG} Failover with {len(node.peers)} node(s)")

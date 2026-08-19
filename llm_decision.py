@@ -94,12 +94,12 @@ def local_llm_decide(state: dict, node_id: str, llm_tok, llm_mdl, task_type: str
 
     # Task data privacy fit assessment
     privacy_fit_note = (f"Task requires AT LEAST {min_in_privacy_lvl} privacy level, "
-                        f"and at most {max_in_privacy_lvl} privacy level; "
-                        f"Node privacy level is {privacy_level} ")
+                        f"and AT MOST {max_in_privacy_lvl} privacy level; "
+                        f"Node privacy level is {privacy_level}.")
     
     # Task priority fit assessment
     priority_fit_note = (f"Task with priority {task_priority} requires {reliability_requirement}; "
-                         f"Node reliability level is {reliability_level}")
+                         f"Node reliability level is {reliability_level}.")
 
 #    system_msg = (
 #        "You are a concise edge-AI node policy engine. "
