@@ -8,8 +8,6 @@ from lstm_scoring import load_balanced_score
 from task_assign import assign_task, enqueue_retry, record_assignment
 #from logger import log_latency
 
-# TODO: Who decides these values for each task? Should they be configurable? Should they be based on the task type? 
-#       Should it be a human who decides or some AI?
 TASK_TYPES              = ["CLASSIFICATION", "TIMESERIES", "CV_INFERENCE"]
 DATA_PRIVACY_LEVELS     = ["PUBLIC", "INTERNAL", "CONFIDENTIAL", "RESTRICTED"]
 TASK_PRIORITY_LEVELS    = ["HIGH", "MEDIUM", "LOW"]
@@ -40,7 +38,7 @@ async def next_task(node, task_cycle) -> tuple[str, str, int]:
     out_data_privacy_level = random.choice(DATA_PRIVACY_LEVELS)
     task_priority = random.choice(TASK_PRIORITY_LEVELS)
 
-# NOTE: Use these instead of random generating, when everything else is done and working!
+# NOTE: These are one way of giving the task attributes to the system
 #    in_data_privacy_level = input("Enter input data privacy level (PUBLIC, INTERNAL, CONFIDENTIAL, RESTRICTED): ")
 #    out_data_privacy_level = input("Enter output data privacy level (PUBLIC, INTERNAL, CONFIDENTIAL, RESTRICTED): ")
 #    task_priority = input("Enter task priority (HIGH, MEDIUM, LOW): ")
@@ -102,7 +100,7 @@ async def send_task_request(node, task_req) -> list:
 
 
 async def get_bids(node, bid_req: Message, sent_reqests: int):
-    print(f"{TAG} Asking for bids from peers, for task {bid_req.payload["task_id"]} ...")
+    print(f"{TAG} Requesting for bids from peers...")
     bids = []
 
     for lan, peer_id, ip in node.peers:
@@ -181,7 +179,7 @@ async def run_negotiation(node, task_id: str, task_type: str, in_data_privacy_lv
     ranked = sorted(bids,
         key=lambda bid: load_balanced_score(node, bid, all_bidders), reverse=True)
     
-    print(f"{TAG} Final ranking: \n")
+    print(f"\n{TAG} Final ranking: \n")
     for i, bid in enumerate(ranked):
         peer_id = bid["node_id"]
         print(f"{i+1}. {peer_id}: raw score = {bid["score"]}, adjusted score = {bid["adj_score"]}, risk = {bid["risk"]}")
@@ -193,7 +191,7 @@ async def run_negotiation(node, task_id: str, task_type: str, in_data_privacy_lv
     results["task_req_start"] = task_req_start
     results["last_bid_time"]  = last_bid_time
 
-    print(f"{TAG} Selected winner: {ranked[0]["node_id"]}")
+    #print(f"{TAG} Selected winner: {ranked[0]["node_id"]}")
 
     print(f"{TAG} Ranking: {results}")
 
@@ -330,9 +328,11 @@ async def start(node):
             await asyncio.sleep(TASK_INTERVAL)
             continue
 
-        print(f"\n{TAG} {'='*52}")
-        print(f"{TAG} New task: task id={task_id}, type={task_type}")
-        print(f"{TAG} {'='*52}")
+        print(f"\n{'='*52}")
+        print(f"{TAG}   New task: task id={task_id}, type={task_type}")
+        print(f"        in data privacy lvl={in_data_privacy_lvl}, out data privacy lvl={out_data_privacy_lvl}")
+        print(f"        task priority={task_priority}")
+        print(f"{'='*52}")
 
 
         negotiation_results = await run_negotiation(node, task_id, task_type, 
@@ -351,7 +351,7 @@ async def start(node):
             for candidate in all_bids:
                 peer_id = candidate["node_id"]
 
-                print(f"{TAG} Assigning task to node {peer_id}...")
+                #print(f"{TAG} Assigning task to node {peer_id}...")
 
                 task_assign_time = time()   # T3: task assignment sent
 
@@ -359,7 +359,7 @@ async def start(node):
                     record_assignment(node, peer_id)
                     assigned = True
 
-                    print(f"{TAG} Task assignment successful! Task assigned to node {peer_id}")
+                    print(f"{TAG} Task assignment successful!\n")
 
                     # Latency breakdown (excludes task execution)
                     t1 = negotiation_results.get("broadcast_start", task_assign_time)

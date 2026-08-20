@@ -97,15 +97,15 @@ class MessageBus:
 
         lan, topic, ip = to
 
-        print(f"{TAG} Sending request to node {topic} in LAN {lan}")
+        #print(f"{TAG} Sending request to node {topic} in LAN {lan}")
 
         if self.node.lan == lan:    # If the target node is on the same LAN, use ZeroMQ for direct communication
             if not ip:
                 return
-            print(f"{TAG} Using ZeroMQ for local request")
+            #print(f"{TAG} Using ZeroMQ for local request")
             return await self._send_zmq(ip, msg)
         else:
-            print(f"{TAG} Using NATS for remote request")
+            #print(f"{TAG} Using NATS for remote request")
             return await self._request_nats(topic, msg, timeout)
 
 
@@ -209,7 +209,7 @@ class MessageBus:
 
     async def _request_nats(self, topic: str, msg: Message, timeout: float) -> Message:
         try:
-            print(f"{TAG} Sending NATS request to {topic} with payload: {msg.payload}")
+            #print(f"{TAG} Sending NATS request to {topic} with payload: {msg.payload}")
             reply = await self.nc.request(
                 f"nodes.{topic}",
                 json.dumps(asdict(msg)).encode(),
@@ -219,7 +219,7 @@ class MessageBus:
             reply_data = reply.data.decode()
             reply_JSON = json.loads(reply_data)
 
-            print(f"\n{TAG} Received NATS reply from {topic}: {reply_data}\n")
+            #print(f"\n{TAG} Received NATS reply from {topic}: {reply_data}\n")
 
             response = Message(**reply_JSON)
             return response
@@ -232,7 +232,7 @@ class MessageBus:
         """Dispatch an incoming NATS direct message to the registered handler."""
         try:
             msg = Message(**json.loads(raw_msg.data.decode()))
-            print(f"{TAG} Received NATS message of type {msg.type} from {msg.originator_node}\n")
+            #print(f"{TAG} Received NATS message of type {msg.type} from {msg.originator_node}\n")
             response = await self._dispatch(msg)
             if raw_msg.reply and response is not None:
                 await self.nc.publish(raw_msg.reply, json.dumps(asdict(response)).encode())
@@ -246,7 +246,7 @@ class MessageBus:
             data = json.loads(raw_msg.data)
             node_id = data["node_id"]
 
-            print(f"{TAG} Heartbeat signal from node: {node_id}")
+            #print(f"{TAG} Heartbeat signal from node: {node_id}")
 
             if node_id == self.node.id:
                 return  # ignore own heartbeat
@@ -275,7 +275,7 @@ class MessageBus:
 
     async def _send_zmq(self, ip: str, msg: Message) -> Message:
         """Send a message through the ZMQ request socket."""
-        print(f"{TAG} Sending ZMQ message to {ip}...")
+        #print(f"{TAG} Sending ZMQ message to {ip}...")
         try:
             req_sock = self.ctx.socket(zmq.REQ)
             #req_sock.setsockopt(zmq.RCVTIMEO, 5000)
@@ -323,7 +323,7 @@ class MessageBus:
 
     
     async def _dispatch(self, msg: Message) -> Message:
-        print(f"{TAG} Dispatching message of type {msg.type} to handler...\n")
+        #print(f"{TAG} Dispatching message of type {msg.type} to handler...\n")
 
         handler = self._handlers.get(msg.type)
 
