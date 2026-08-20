@@ -73,6 +73,8 @@ def handle_bid_request(node, bid_req: dict, originator_lan: str, originator_node
                "node_id": node.id,
                "score": node_state["score"],
                "risk": node_state["risk"],
+               "reliability_lvl": reliability_level,
+               "privacy_lvl": privacy_level,
                "reason": llm_decision["reason"], 
                "decision": "ACCEPT"
             }

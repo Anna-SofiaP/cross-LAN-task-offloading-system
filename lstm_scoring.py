@@ -81,6 +81,8 @@ def load_balanced_score(node, bid: dict, all_bidders: list = None) -> float:
     """
     peer_id = bid.get("node_id")
     raw = bid.get("score", 0.0)
+    reliability_lvl = bid.get("reliability_lvl", "moderate")    # In reliability it is okay to give the node a chance
+    privacy_lvl = bid.get("privacy_lvl", "low")                 # Do not trust nodes by default
 
     print(f"{TAG} Calculating load balanced score for peer {peer_id}, score={raw}...")
 
