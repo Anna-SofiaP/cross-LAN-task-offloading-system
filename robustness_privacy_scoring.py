@@ -117,6 +117,11 @@ def get_reliability_level(node, node_state: dict, lan: str) -> str:
     node_failures = node_state.get("node_failures", 0)
     my_lan = node.lan
 
+    print(f"{TAG} Current node state: "
+          f"    assigned_tasks = {assigned_tasks}"
+          f"    completed_tasks = {completed_tasks}"
+          f"    node_failures = {node_failures}")
+
     # Score initialization and calculation
     # Task assignment success score: smoothing for new nodes (0.5), so no multiplication with zero
     task_assignment_success_score = completed_tasks / assigned_tasks if assigned_tasks > 0 else 0.5
@@ -144,6 +149,10 @@ def get_reliability_level(node, node_state: dict, lan: str) -> str:
 def get_privacy_level(node_state: dict) -> str:
     usr_type_score = node_state.get("usr_type_score")
     network_trust_score = node_state.get("network_trust_score")
+
+    print(f"{TAG} Current node state: "
+          f"    usr_type_score = {usr_type_score}"
+          f"    network_trust_score = {network_trust_score}")
 
     combined_score = round(usr_type_score * network_trust_score, 2)
 
