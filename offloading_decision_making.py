@@ -1,16 +1,16 @@
 # Node and task matching ------------------------------------------------------------
 TASK_DATA_PRIVACY_REQUIREMENTS = {  # Match task in data privacy and out data privacy levels with node privacy level
-    "PUBLIC":       ("low"),
-    "INTERNAL":     ("moderate"),
-    "CONFIDENTIAL": ("high"),
-    "RESTRICTED":   ("high"),
+    "PUBLIC":       "low",
+    "INTERNAL":     "moderate",
+    "CONFIDENTIAL": "high",
+    "RESTRICTED":   "high",
 }
 
 
 TASK_PRIORITY_REQUIREMENTS = {  # Match task priority level with node reliability level
-    "LOW":          ("low"),
-    "MEDIUM":       ("moderate"),
-    "HIGH":         ("high"),
+    "LOW":          "low",
+    "MEDIUM":       "moderate",
+    "HIGH":         "high",
 }
 
 # Scalar values to reliability and privacy levels -----------------------------------
@@ -29,6 +29,7 @@ DISCARD_LIMIT = -2
 ABSOLUTE_DIFFERENCE_LIMIT = -1
 LOW_W_SUM_PENALTY_VAL = 1.2
 HIGH_W_SUM_PENALTY_VAL = 1.5
+ZERO_SAFEGUARD = 0.1    # To prevent weighted sum from being 0 (and division by that 0 later in the code)
 PRIVACY_WEIGHT = 0.5
 RELIABILITY_WEIGHT = 0.5
 
@@ -57,7 +58,7 @@ def load_balanced_score(node, bid: dict, all_bidders: list = None) -> float:
     peer_id = bid.get("node_id")
     raw = bid.get("score", 0.0)
 
-    print(f"{TAG} Calculating load balanced score for peer {peer_id}, score={raw}...")
+    #print(f"{TAG} Calculating load balanced score for peer {peer_id}, score={raw}...")
 
     task_assign_counts = dict(node.assigned_task_counts)
 
@@ -67,17 +68,16 @@ def load_balanced_score(node, bid: dict, all_bidders: list = None) -> float:
     if all_bidders:
         live_peers = list(set(live_peers) | set(all_bidders))
 
-    print(f"{TAG} All live peers: {live_peers}")
+    #print(f"{TAG} All live peers: {live_peers}")
 
-    # Get the task assignment counts of all peers. If there are no live peers...
+    # Get the task assignment counts of all peers.
     all_task_assign_counts = {k: task_assign_counts.get(k, 0) for k in live_peers}
     if not all_task_assign_counts:
-        print(f"{TAG} No other nodes have been assigned a task before.")
         return round(raw + NEW_NODE_BONUS, 4)
 
     # Get the task assignment counts of the currently examined peer.
     peer_task_assign_counts = all_task_assign_counts.get(peer_id, 0)
-    print(f"{TAG} Task assign count of peer {peer_id}: {peer_task_assign_counts}")
+    #print(f"{TAG} Task assign count of peer {peer_id}: {peer_task_assign_counts}")
 
     avg = sum(all_task_assign_counts.values()) / max(len(all_task_assign_counts), 1)
 
@@ -99,44 +99,48 @@ def load_balanced_score(node, bid: dict, all_bidders: list = None) -> float:
 
 # TODO: Remove, and just use scalars in the whole level assignment process!
 def level_to_scalar(level):
-    return LEVELS_TO_SCALARS[level]
+    scalar = LEVELS_TO_SCALARS[level]
+    #print(f"{TAG} Level: {level}, Scalar: {scalar}, Scalar type: {type(scalar)}")
+    return scalar
 
 
 
 def reliability_and_privacy_assessment(bid: dict, in_data_privacy_lvl, out_data_privacy_lvl, task_priority):
     # Peer node privacy and reliability levels
     peer_id = bid.get("node_id")
+
     node_reliability_lvl = level_to_scalar(bid.get("reliability_lvl", "moderate"))    # In reliability it is okay to give the node a chance
     node_privacy_lvl = level_to_scalar(bid.get("privacy_lvl", "low"))                 # Do not trust nodes by default regarding privacy
 
     # Required privacy and reliability levels for the task
     in_privacy_requirement = level_to_scalar(TASK_DATA_PRIVACY_REQUIREMENTS.get(in_data_privacy_lvl, "CONFIDENTIAL"))
-    out_privacy_requirement = level_to_scalar(TASK_DATA_PRIVACY_REQUIREMENTS.get(out_data_privacy_lvl, "PUBLIC"))
+    #out_privacy_requirement = level_to_scalar(TASK_DATA_PRIVACY_REQUIREMENTS.get(out_data_privacy_lvl, "PUBLIC"))
     reliability_requirement = level_to_scalar(TASK_PRIORITY_REQUIREMENTS.get(task_priority, "MEDIUM"))
 
     # Calculate difference between node privacy/reliability level and task requirements
-    p_delta = node_privacy_lvl - in_privacy_requirement if node_privacy_lvl > in_data_privacy_lvl else DISCARD_LIMIT
-    r_delta = node_reliability_lvl - reliability_requirement if node_reliability_lvl > reliability_requirement else DISCARD_LIMIT
+    p_delta = node_privacy_lvl - in_privacy_requirement if node_privacy_lvl >= in_privacy_requirement else DISCARD_LIMIT
+    r_delta = node_reliability_lvl - reliability_requirement if node_reliability_lvl >= reliability_requirement else DISCARD_LIMIT
 
     # Discard nodes with too big a gap between task requirement and node privacy or reliability level
     if p_delta == DISCARD_LIMIT or r_delta == DISCARD_LIMIT:
+        print(f"{TAG} Discarding node {peer_id} with too low p_delta={p_delta} or r_delta={r_delta} value...")
         bid["pr_score"] = DISCARD_LIMIT
         return DISCARD_LIMIT
     
     # If p_delta or r_delta value is -1, don't discard, but give the node a higher w_sum value than in the actual w_sum calculation
     if p_delta == ABSOLUTE_DIFFERENCE_LIMIT and r_delta == ABSOLUTE_DIFFERENCE_LIMIT:
+        print(f"{TAG} p_delta and r_delta are both slightly too low -- w_sum={HIGH_W_SUM_PENALTY_VAL}")
         return HIGH_W_SUM_PENALTY_VAL
+    
     if p_delta == ABSOLUTE_DIFFERENCE_LIMIT ^ r_delta == ABSOLUTE_DIFFERENCE_LIMIT:
+        print(f"{TAG} Either p_delta or r_delta has slightly too low value -- w_sum={LOW_W_SUM_PENALTY_VAL}")
         return LOW_W_SUM_PENALTY_VAL
     
     # Normalize privacy delta and reliability delta values to [0, 1]:
     p_norm = p_delta / NORM_DIVISOR
     r_norm = r_delta / NORM_DIVISOR
 
-    w_sum = PRIVACY_WEIGHT * p_norm + RELIABILITY_WEIGHT * r_norm
-
-    # NOTE: for debugging: check that weighted sum is less than or equal to 1
-    assert w_sum <= 1.0
+    w_sum = (PRIVACY_WEIGHT * p_norm + RELIABILITY_WEIGHT * r_norm) + ZERO_SAFEGUARD
 
     print(f"{TAG} {peer_id}: p_delta={p_delta}, r_delta={r_delta}, p_norm={p_norm}, r_norm={r_norm}, w_sum={w_sum}")
 
@@ -145,12 +149,14 @@ def reliability_and_privacy_assessment(bid: dict, in_data_privacy_lvl, out_data_
     return w_sum
 
 
-def make_final_offloading_decision(bid: dict, all_bids: list):
+def make_final_offloading_decision(bid: dict, all_valid_bids: list):
     peer_id = bid.get("node_id")
 
     # Calculate adjusted score and privacy-reliability score divisors for normalization
-    adj_score_divisor = sum([b["adj_score"] for b in all_bids])
-    pr_score_divisor = sum([1 / b["pr_score"] for b in all_bids])
+    adj_score_divisor = sum([b["adj_score"] for b in all_valid_bids])
+    pr_score_divisor = sum([1 / b["pr_score"] for b in all_valid_bids])
+
+    print(f"{TAG} a_score_divisor={adj_score_divisor}, pr_score_divisor={pr_score_divisor}")
 
     # Normalize values and calculate weighted product
     adj_score_norm = bid["adj_score"] / adj_score_divisor
