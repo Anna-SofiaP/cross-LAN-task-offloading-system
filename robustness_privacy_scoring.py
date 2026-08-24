@@ -37,7 +37,7 @@ TAG = "[LEVELS]"
 # Reliability ----------------------------------------------------------------------
 NODE_FAILURE_SCORE = [(0, 1, 1.0),          # (min_value, max_value, score):
                       (2, 3, 0.8),          # min_value: minimum no. of node failures in a 7 day period 
-                      (4, 4, 0.6)]          # max_value: maximum no. of node failures in a 7 day period
+                      (4, 6, 0.6)]          # max_value: maximum no. of node failures in a 7 day period
 
 NODE_ACCESS_SCORE = (1.0, 0.8) # 1.0 = node is in the same LAN as the task originator, 0.8 = node is in a different LAN
 
@@ -84,7 +84,7 @@ PRIVACY_LEVELS = {
 
 def get_network_trustworthiness_score(network_type):
     network_trust_score = 0.4   # Default value
-    
+
     for n_type, score in NETWORK_TRUST_SCORE:
         if n_type == network_type:
             network_trust_score = score
@@ -105,13 +105,12 @@ def get_device_user_type_score(device_user_type):
 
 
 def get_node_failure_score(node_failures):
-    node_failure_score = 0.6    # Default value
+    node_failure_score = 0.4    # Default value
 
     for min_value, max_value, score in NODE_FAILURE_SCORE:
         if min_value <= node_failures <= max_value:
             node_failure_score = score
 
-    print(f"{TAG} Node failure score: {node_failure_score}")
     return node_failure_score
 
 
@@ -123,7 +122,7 @@ def get_reliability_level(node, node_state: dict, lan: str) -> str:
     node_failures = node_state.get("node_failures", 0)
     my_lan = node.lan
 
-    print(f"{TAG} Current node state: "
+    print(f"{TAG} Current node state:"
           f"    assigned_tasks = {assigned_tasks}"
           f"    completed_tasks = {completed_tasks}"
           f"    node_failures = {node_failures}")
@@ -132,11 +131,14 @@ def get_reliability_level(node, node_state: dict, lan: str) -> str:
     # Task assignment success score: smoothing for new nodes (0.5), so no multiplication with zero
     task_assignment_success_score = completed_tasks / assigned_tasks if assigned_tasks > 0 else 0.5
     node_failure_score = get_node_failure_score(node_failures)
-    node_access_score = NODE_ACCESS_SCORE[0] if my_lan == lan else NODE_ACCESS_SCORE[1]
+    #node_access_score = NODE_ACCESS_SCORE[0] if my_lan == lan else NODE_ACCESS_SCORE[1]
 
-    combined_score = round(task_assignment_success_score * node_failure_score * node_access_score, 4)
+    print(f"{TAG} task_assignment_score={task_assignment_success_score}, node_failure_score={node_failure_score}")
 
-    print(f"{TAG} Combined reliability score: {combined_score}")
+    #combined_score = round(task_assignment_success_score * node_failure_score * node_access_score, 4)
+    combined_score = round(task_assignment_success_score * node_failure_score, 4)
+
+    print(f"{TAG} --> Combined reliability score: {combined_score}")
 
     # Determine the reliability level based on the combined score
     reliability_level = "low"
@@ -146,7 +148,7 @@ def get_reliability_level(node, node_state: dict, lan: str) -> str:
             reliability_level = level
             break
 
-    print(f"{TAG} Reliability level: {reliability_level}")
+    print(f"{TAG} == Reliability level: {reliability_level} ==")
  
     return reliability_level
 
@@ -162,7 +164,7 @@ def get_privacy_level(node_state: dict) -> str:
 
     combined_score = round(usr_type_score * network_trust_score, 2)
 
-    print(f"{TAG} Combined privacy score: {combined_score}")
+    print(f"{TAG} --> Combined privacy score: {combined_score}")
 
     # Determine the privacy level based on the combined score
     privacy_level = "low"
@@ -172,6 +174,6 @@ def get_privacy_level(node_state: dict) -> str:
             privacy_level = level
             break
 
-    print(f"{TAG} Privacy level: {privacy_level}")
+    print(f"{TAG} == Privacy level: {privacy_level} ==")
 
     return privacy_level
