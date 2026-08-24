@@ -82,7 +82,9 @@ PRIVACY_LEVELS = {
                 }
 
 
-def get_network_trustworthiness_score(network_type, network_trust_score = 0.4):
+def get_network_trustworthiness_score(network_type):
+    network_trust_score = 0.4   # Default value
+    
     for n_type, score in NETWORK_TRUST_SCORE:
         if n_type == network_type:
             network_trust_score = score
@@ -91,7 +93,9 @@ def get_network_trustworthiness_score(network_type, network_trust_score = 0.4):
     return network_trust_score
 
 
-def get_device_user_type_score(device_user_type, usr_type_score = 0.4):
+def get_device_user_type_score(device_user_type):
+    usr_type_score = 0.4    # Default value
+
     for usr_type, score in DEVICE_USER_TYPE_SCORE:
         if usr_type == device_user_type:
             usr_type_score = score
@@ -100,7 +104,9 @@ def get_device_user_type_score(device_user_type, usr_type_score = 0.4):
     return usr_type_score
 
 
-def get_node_failure_score(node_failures, node_failure_score = 1.0):
+def get_node_failure_score(node_failures):
+    node_failure_score = 0.6    # Default value
+
     for min_value, max_value, score in NODE_FAILURE_SCORE:
         if min_value <= node_failures <= max_value:
             node_failure_score = score
