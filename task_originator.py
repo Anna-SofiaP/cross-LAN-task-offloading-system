@@ -177,24 +177,10 @@ async def run_negotiation(node, task_id: str, task_type: str, in_data_privacy_lv
     # Pass all bidding node id:s so load_balanced_score sees the full picture
     all_bidders = [bid["node_id"] for bid in bids]
 
-    # NOTE: descending order: bigger values are better
-    # TODO: this doesn't need to be sorted! The values just need to be calculated!
-    #score_ranked = sorted(bids,
-    #    key=lambda bid: load_balanced_score(node, bid, all_bidders), reverse=True)
-
-    # TODO: move this to the bottom!
-    #for i, bid in enumerate(score_ranked):
-    #    peer_id = bid["node_id"]
-    #    print(f"{i+1}. {peer_id}: raw score={bid["score"]}, adjusted score={bid["adj_score"]}, risk={bid["risk"]}\n"
-    #          f"    reliability level={bid["reliability_lvl"]}, privacy level={bid["privacy_lvl"]}")
-
-    ## TODO: This doesn't need to be sorted! The values just need to be calculated!
-    #pr_ranked = sorted(score_ranked,
-    #    key=lambda bid: reliability_and_privacy_assessment(bid, in_data_privacy_lvl, out_data_privacy_lvl, task_priority))
 
     for bid in bids:
         bid["adj_score"] = load_balanced_score(node, bid, all_bidders)
-        bid["pr_score"] = reliability_and_privacy_assessment(bid, in_data_privacy_lvl, out_data_privacy_lvl, task_priority)
+        bid["pr_score"] = reliability_and_privacy_assessment(bid, in_data_privacy_lvl, out_data_privacy_lvl, task_priority, node.lan)
 
     # Discard all nodes with joint privacy-reliability score of value -2
     valid_bids = [bid for bid in bids if bid["pr_score"] != -2]
