@@ -29,7 +29,7 @@ TASK_PRIORITY_REQUIREMENTS = {
 # Example: if a task has priority "HIGH", then the node must have a reliability level of at least "high" to be suitable for the task.
 
 
-def local_llm_decide(state: dict, node_id: str, llm_tok, llm_mdl, task_type: str, reliability_level: str, privacy_level: str,
+def local_llm_decide(my_lan: str, orig_lan: str, state: dict, node_id: str, llm_tok, llm_mdl, task_type: str, reliability_level: str, privacy_level: str,
                                     in_data_privacy_lvl: str, out_data_privacy_lvl: str, task_priority: str) -> dict:
     print(f"{TAG} Running LLM decision for task of type {task_type}")
 
@@ -48,9 +48,9 @@ def local_llm_decide(state: dict, node_id: str, llm_tok, llm_mdl, task_type: str
         return "high" if value>high else ("moderate" if value>low else "low")
 
     cpu_need, mem_need, desc = TASK_PROFILES.get(task_type, "GENERIC")
-    min_in_privacy_lvl, max_in_privacy_lvl = TASK_DATA_PRIVACY_REQUIREMENTS.get(in_data_privacy_lvl, "CONFIDENTIAL")
-    #TODO: min_out_privacy_lvl, max_out_privacy_lvl = TASK_DATA_PRIVACY_REQUIREMENTS.get(out_data_privacy_lvl, "PUBLIC")
-    reliability_requirement = TASK_PRIORITY_REQUIREMENTS.get(task_priority, "MEDIUM")
+    #min_in_privacy_lvl, max_in_privacy_lvl = TASK_DATA_PRIVACY_REQUIREMENTS.get(in_data_privacy_lvl, "CONFIDENTIAL")
+    #min_out_privacy_lvl, max_out_privacy_lvl = TASK_DATA_PRIVACY_REQUIREMENTS.get(out_data_privacy_lvl, "PUBLIC")
+    #reliability_requirement = TASK_PRIORITY_REQUIREMENTS.get(task_priority, "MEDIUM")
 
 
     horizon = state.get("horizon", [])
@@ -62,8 +62,10 @@ def local_llm_decide(state: dict, node_id: str, llm_tok, llm_mdl, task_type: str
                      "falling" if horizon[-1][1]<horizon[0][1]-0.03 else "stable")
 
     # TODO: think about this more...
-    hard_reject = (score < ACCEPT_SCORE_MIN or risk=="CRITICAL"
-                   or state.get("is_busy", False))
+    hard_reject = (score < ACCEPT_SCORE_MIN or 
+                   risk=="CRITICAL" or 
+                   state.get("is_busy", False) or
+                   ((out_data_privacy_lvl in ["CONFIDENTIAL", "RESTRICTED"]) and (my_lan != orig_lan)))
     
     # Build decision word SEPARATELY -- no nested f-string
     dw   = "REJECT" if hard_reject else "ACCEPT"
@@ -92,44 +94,44 @@ def local_llm_decide(state: dict, node_id: str, llm_tok, llm_mdl, task_type: str
     else:
         fit_note = f"CPU={cpu:.1f}%, mem={mem:.1f}%, score={score:.4f}"
 
-    # Task data privacy fit assessment
-    privacy_fit_note = (f"Task requires AT LEAST {min_in_privacy_lvl} privacy level, "
-                        f"and AT MOST {max_in_privacy_lvl} privacy level; "
-                        f"Node privacy level is {privacy_level}.")
-    
-    # Task priority fit assessment
-    priority_fit_note = (f"Task with priority {task_priority} requires {reliability_requirement}; "
-                         f"Node reliability level is {reliability_level}.")
-
-#    system_msg = (
-#        "You are a concise edge-AI node policy engine. "
-#        "Write exactly ONE sentence as the reason. "
-#        "The sentence MUST: "
-#        "(1) start with the task type name (e.g. 'CLASSIFICATION requires...'), "
-#        "(2) include at least two specific numbers from the node state, "
-#        "(3) explain the concrete fit or mismatch -- not just 'meets threshold'. "
-#        "BAD example: 'All metrics meet requirements.' "
-#        "GOOD example: 'CLASSIFICATION requires moderate CPU and this node shows "
-#        "only 3.1% CPU (stable trend) with score 0.7205, well above the 0.5 threshold.' "
-#        "Never start with I. Never be vague."
-#    )
+#    # Task data privacy fit assessment
+#    privacy_fit_note = (f"Task requires AT LEAST {min_in_privacy_lvl} privacy level, "
+#                        f"and AT MOST {max_in_privacy_lvl} privacy level; "
+#                        f"Node privacy level is {privacy_level}.")
+#    
+#    # Task priority fit assessment
+#    priority_fit_note = (f"Task with priority {task_priority} requires {reliability_requirement}; "
+#                         f"Node reliability level is {reliability_level}.")
 
     system_msg = (
         "You are a concise edge-AI node policy engine. "
-        "Write exactly THREE sentences as the reason. "
-        "The reason MUST: "
-        "(1) start with the task type name (e.g. 'CLASSIFICATION requires...') and information about the node's state, "
-        "(2) continue with the privacy level of the node and the privacy requirement of the task,"
-        "(3) conclude with the reliability level of the node and the reliability requirement of the task,"
-        "(4) include at least two specific numbers from the node state, "
-        "(5) explain the concrete fit or mismatch -- not just 'meets threshold'. "
+        "Write exactly ONE sentence as the reason. "
+        "The sentence MUST: "
+        "(1) start with the task type name (e.g. 'CLASSIFICATION requires...'), "
+        "(2) include at least two specific numbers from the node state, "
+        "(3) explain the concrete fit or mismatch -- not just 'meets threshold'. "
         "BAD example: 'All metrics meet requirements.' "
         "GOOD example: 'CLASSIFICATION requires moderate CPU and this node shows "
-        "only 3.1% CPU (stable trend) with score 0.7205, well above the 0.5 threshold. "
-        "The node's privacy level is moderate, which meets the task's requirement of at least moderate privacy. "
-        "The node's reliability level is high, which exceeds the task's requirement of medium reliability.' "
+        "only 3.1% CPU (stable trend) with score 0.7205, well above the 0.5 threshold.' "
         "Never start with I. Never be vague."
     )
+
+#    system_msg = (
+#        "You are a concise edge-AI node policy engine. "
+#        "Write exactly THREE sentences as the reason. "
+#        "The reason MUST: "
+#        "(1) start with the task type name (e.g. 'CLASSIFICATION requires...') and information about the node's state, "
+#        "(2) continue with the privacy level of the node and the privacy requirement of the task,"
+#        "(3) conclude with the reliability level of the node and the reliability requirement of the task,"
+#        "(4) include at least two specific numbers from the node state, "
+#        "(5) explain the concrete fit or mismatch -- not just 'meets threshold'. "
+#        "BAD example: 'All metrics meet requirements.' "
+#        "GOOD example: 'CLASSIFICATION requires moderate CPU and this node shows "
+#        "only 3.1% CPU (stable trend) with score 0.7205, well above the 0.5 threshold. "
+#        "The node's privacy level is moderate, which meets the task's requirement of at least moderate privacy. "
+#        "The node's reliability level is high, which exceeds the task's requirement of medium reliability.' "
+#        "Never start with I. Never be vague."
+#    )
 
     user_msg = (
         f"Node {node_id} — decision for '{task_type}' task.\n"
@@ -143,8 +145,8 @@ def local_llm_decide(state: dict, node_id: str, llm_tok, llm_mdl, task_type: str
         f"  Risk={risk}  Rep={rep:.3f}  Rel={rel:.3f}\n"
         f"  Tasks completed={done}\n\n"
         f"Fit assessment: {fit_note}\n"
-        f"Privacy assessment: {privacy_fit_note}\n"
-        f"Reliability assessment: {priority_fit_note}\n"
+#        f"Privacy assessment: {privacy_fit_note}\n"
+#        f"Reliability assessment: {priority_fit_note}\n"
         f"Decision: {rule}\n\n"
         f"Write the reason sentences — cite the specific numbers and information above.\n"
         f"Respond with ONLY this JSON:\n{json_tmpl}"
