@@ -185,6 +185,9 @@ async def run_negotiation(node, task_id: str, task_type: str, in_data_privacy_lv
     # Discard all nodes with joint privacy-reliability score of value -2
     valid_bids = [bid for bid in bids if bid["pr_score"] != -2]
 
+    if not valid_bids:
+        return None
+
     final_ranking = sorted(valid_bids,
         key=lambda bid: make_final_offloading_decision(bid, valid_bids), reverse=True)
     
@@ -402,7 +405,7 @@ async def start(node):
                 await enqueue_retry(node, task_type, task_id, retry_attempt)
 
         else:
-            print(f"{TAG} No bids for task {task_id}")
+            print(f"{TAG} No valid bids for task {task_id} -- retry task")
             await enqueue_retry(node, task_type, task_id, retry_attempt)
 
         await asyncio.sleep(TASK_INTERVAL) 
