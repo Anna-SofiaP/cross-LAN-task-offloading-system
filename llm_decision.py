@@ -69,7 +69,7 @@ def local_llm_decide(my_lan: str, orig_lan: str, state: dict, node_id: str, llm_
     
     # Build decision word SEPARATELY -- no nested f-string
     dw   = "REJECT" if hard_reject else "ACCEPT"
-    rule = ("REJECT: score below threshold, CRITICAL risk, or node busy."
+    rule = ("REJECT: score below threshold, CRITICAL risk, node busy, or node does not meet task's output data privacy requirement."
             if hard_reject else
             "ACCEPT: all thresholds met, node is available.")
 
