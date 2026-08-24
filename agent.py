@@ -47,6 +47,7 @@ def handle_bid_request(node, bid_req: dict, originator_lan: str, originator_node
           f"     type={task_type}\n")
     
     node_state = node.state
+    my_lan = node.lan
 
     reliability_level = get_reliability_level(node, node_state, originator_lan)
     privacy_level = get_privacy_level(node_state)
@@ -55,7 +56,7 @@ def handle_bid_request(node, bid_req: dict, originator_lan: str, originator_node
           f"risk={node_state['risk']}  busy={node_state.get('is_busy', False)} " \
           f"reliability_level={reliability_level}  privacy_level={privacy_level}")
     
-    llm_decision = local_llm_decide(node_state, node.id, node.llm_tok, node.llm_mdl, task_type, 
+    llm_decision = local_llm_decide(my_lan, originator_lan, node_state, node.id, node.llm_tok, node.llm_mdl, task_type, 
                                     reliability_level, privacy_level, 
                                     in_data_privacy_lvl, out_data_privacy_lvl, task_priority)
 
@@ -71,6 +72,7 @@ def handle_bid_request(node, bid_req: dict, originator_lan: str, originator_node
            "payload": {
                "task_id": task_id,
                "node_id": node.id,
+               "peer_lan": my_lan,
                "score": node_state["score"],
                "risk": node_state["risk"],
                "reliability_lvl": reliability_level,
