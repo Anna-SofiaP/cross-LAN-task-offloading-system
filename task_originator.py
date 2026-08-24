@@ -196,8 +196,11 @@ async def run_negotiation(node, task_id: str, task_type: str, in_data_privacy_lv
         bid["adj_score"] = load_balanced_score(node, bid, all_bidders)
         bid["pr_score"] = reliability_and_privacy_assessment(bid, in_data_privacy_lvl, out_data_privacy_lvl, task_priority)
 
-    final_ranking = sorted(bids,
-        key=lambda bid: make_final_offloading_decision(bid, bids), reverse=True)
+    # Discard all nodes with joint privacy-reliability score of value -2
+    valid_bids = [bid for bid in bids if bid["pr_score"] != -2]
+
+    final_ranking = sorted(valid_bids,
+        key=lambda bid: make_final_offloading_decision(bid, valid_bids), reverse=True)
     
     print(f"\n{TAG} Final ranking: \n")
 
