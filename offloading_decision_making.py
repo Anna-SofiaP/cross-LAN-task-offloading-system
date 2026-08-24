@@ -105,9 +105,10 @@ def level_to_scalar(level):
 
 
 
-def reliability_and_privacy_assessment(bid: dict, in_data_privacy_lvl, out_data_privacy_lvl, task_priority):
+def reliability_and_privacy_assessment(bid: dict, in_data_privacy_lvl, out_data_privacy_lvl, task_priority, my_lan):
     # Peer node privacy and reliability levels
     peer_id = bid.get("node_id")
+    peer_lan = bid.get("peer_lan")
 
     node_reliability_lvl = level_to_scalar(bid.get("reliability_lvl", "moderate"))    # In reliability it is okay to give the node a chance
     node_privacy_lvl = level_to_scalar(bid.get("privacy_lvl", "low"))                 # Do not trust nodes by default regarding privacy
@@ -117,13 +118,18 @@ def reliability_and_privacy_assessment(bid: dict, in_data_privacy_lvl, out_data_
     #out_privacy_requirement = level_to_scalar(TASK_DATA_PRIVACY_REQUIREMENTS.get(out_data_privacy_lvl, "PUBLIC"))
     reliability_requirement = level_to_scalar(TASK_PRIORITY_REQUIREMENTS.get(task_priority, "MEDIUM"))
 
+    if (in_data_privacy_lvl in ["CONFIDENTIAL", "RESTRICTED"]) and (peer_lan != my_lan):
+        print(f"{TAG} Node does not meet task's strict input data privacy requirement -- discarding node")
+        bid["pr_score"] = DISCARD_LIMIT
+        return DISCARD_LIMIT
+
     # Calculate difference between node privacy/reliability level and task requirements
     p_delta = node_privacy_lvl - in_privacy_requirement if node_privacy_lvl >= in_privacy_requirement else DISCARD_LIMIT
     r_delta = node_reliability_lvl - reliability_requirement if node_reliability_lvl >= reliability_requirement else DISCARD_LIMIT
 
     # Discard nodes with too big a gap between task requirement and node privacy or reliability level
     if p_delta == DISCARD_LIMIT or r_delta == DISCARD_LIMIT:
-        print(f"{TAG} Discarding node {peer_id} with too low p_delta={p_delta} or r_delta={r_delta} value...")
+        print(f"{TAG} Node {peer_id} has too low p_delta={p_delta} or r_delta={r_delta} value -- discarding node")
         bid["pr_score"] = DISCARD_LIMIT
         return DISCARD_LIMIT
     
@@ -131,8 +137,7 @@ def reliability_and_privacy_assessment(bid: dict, in_data_privacy_lvl, out_data_
     if p_delta == ABSOLUTE_DIFFERENCE_LIMIT and r_delta == ABSOLUTE_DIFFERENCE_LIMIT:
         print(f"{TAG} p_delta and r_delta are both slightly too low -- w_sum={HIGH_W_SUM_PENALTY_VAL}")
         return HIGH_W_SUM_PENALTY_VAL
-    
-    if p_delta == ABSOLUTE_DIFFERENCE_LIMIT ^ r_delta == ABSOLUTE_DIFFERENCE_LIMIT:
+    elif p_delta == ABSOLUTE_DIFFERENCE_LIMIT ^ r_delta == ABSOLUTE_DIFFERENCE_LIMIT:
         print(f"{TAG} Either p_delta or r_delta has slightly too low value -- w_sum={LOW_W_SUM_PENALTY_VAL}")
         return LOW_W_SUM_PENALTY_VAL
     
@@ -140,6 +145,7 @@ def reliability_and_privacy_assessment(bid: dict, in_data_privacy_lvl, out_data_
     p_norm = p_delta / NORM_DIVISOR
     r_norm = r_delta / NORM_DIVISOR
 
+    # Calculate weighted sum
     w_sum = (PRIVACY_WEIGHT * p_norm + RELIABILITY_WEIGHT * r_norm) + ZERO_SAFEGUARD
 
     print(f"{TAG} {peer_id}: p_delta={p_delta}, r_delta={r_delta}, p_norm={p_norm}, r_norm={r_norm}, w_sum={w_sum}")
