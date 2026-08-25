@@ -39,7 +39,7 @@ NODE_FAILURE_SCORE = [(0, 1, 1.0),          # (min_value, max_value, score):
                       (2, 3, 0.8),          # min_value: minimum no. of node failures in a 7 day period 
                       (4, 6, 0.6)]          # max_value: maximum no. of node failures in a 7 day period
 
-NODE_ACCESS_SCORE = (1.0, 0.8) # 1.0 = node is in the same LAN as the task originator, 0.8 = node is in a different LAN
+#NODE_ACCESS_SCORE = (1.0, 0.8) # 1.0 = node is in the same LAN as the task originator, 0.8 = node is in a different LAN
 
 RELIABILITY_LEVELS = {
                         "high": {
@@ -60,11 +60,11 @@ RELIABILITY_LEVELS = {
 # Privacy --------------------------------------------------------------------------
 DEVICE_USER_TYPE_SCORE = [("business", 1.0), 
                    ("personal", 0.8), 
-                   ("public", 0.4)]
+                   ("public", 0.6)]
 
 NETWORK_TRUST_SCORE = [("usr-auth-network", 1.0), 
                        ("private-network", 0.8), 
-                       ("public-network", 0.4)]
+                       ("public-network", 0.6)]
 
 PRIVACY_LEVELS = {
                     "high": {
@@ -83,7 +83,7 @@ PRIVACY_LEVELS = {
 
 
 def get_network_trustworthiness_score(network_type):
-    network_trust_score = 0.4   # Default value
+    network_trust_score = 0.6   # Default value
 
     for n_type, score in NETWORK_TRUST_SCORE:
         if n_type == network_type:
@@ -94,7 +94,7 @@ def get_network_trustworthiness_score(network_type):
 
 
 def get_device_user_type_score(device_user_type):
-    usr_type_score = 0.4    # Default value
+    usr_type_score = 0.6    # Default value
 
     for usr_type, score in DEVICE_USER_TYPE_SCORE:
         if usr_type == device_user_type:
