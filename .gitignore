@@ -11,6 +11,9 @@ lstm_system_monitor1.keras
 load_and_save_llm.py
 qwen2.5_local
 
+# Evaluation
+evaluation_tests/
+
 # Others
 .venv
 __pycache__

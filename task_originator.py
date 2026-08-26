@@ -1,26 +1,26 @@
 import asyncio
 from dataclasses import dataclass
 import itertools
+import json
 import random
 from time import time
 import uuid
 from task_assign import assign_task, enqueue_retry, record_assignment
 from offloading_decision_making import load_balanced_score, reliability_and_privacy_assessment, make_final_offloading_decision
-#from logger import log_latency
+from evaluation_tests.test_result_logger import save_offloading_decision_result, save_failed_offloading_result
 
 TASK_TYPES              = ["CLASSIFICATION", "TIMESERIES", "CV_INFERENCE"]
 DATA_PRIVACY_LEVELS     = ["PUBLIC", "INTERNAL", "CONFIDENTIAL", "RESTRICTED"]
 TASK_PRIORITY_LEVELS    = ["HIGH", "MEDIUM", "LOW"]
-# TODO: Instead of task priority levels, should we have task deadlines? 
-#       For example, a task can be "immediate", "as soon as possible", or "whenever". 
-#       This would be more flexible and specific than just having a priority level. 
-#       The node can then decide if it can complete the task within the deadline based on its current load and predicted future load.
 
 TAG                     = "[ORIG]"
 BID_TIMEOUT             = 160
 TASK_INTERVAL           = 15
 FAILOVER_TIMEOUT        = 60
 HEARTBEAT_INTERVAL      = 20
+
+# Evaluation tests --------------------------------------------------------------
+TEST_CASE_FILE = "./evaluation_tests/test_task_cases.json"
 
 
 @dataclass
@@ -31,7 +31,8 @@ class Message:
     payload: dict = None
 
 
-
+# NOTE: Commented out for evaluation test
+'''
 async def next_task(node, task_cycle) -> tuple[str, str, int]:
     """Returns the new task. Retry queue takes priority."""
     in_data_privacy_level = random.choice(DATA_PRIVACY_LEVELS)
@@ -51,6 +52,7 @@ async def next_task(node, task_cycle) -> tuple[str, str, int]:
     task_id = str(uuid.uuid4())[:8]
 
     return next(task_cycle), task_id, in_data_privacy_level, out_data_privacy_level, task_priority, 0
+'''
 
 
 def remove_dead_node(node, peer_id: str) -> bool:
@@ -205,10 +207,6 @@ async def run_negotiation(node, task_id: str, task_type: str, in_data_privacy_lv
     results["task_req_start"] = task_req_start
     results["last_bid_time"]  = last_bid_time
 
-    #print(f"{TAG} Selected winner: {ranked[0]["node_id"]}")
-
-    #print(f"{TAG} Ranking: {results}")
-
     return results
 
 
@@ -328,14 +326,40 @@ async def start(node):
     """Start the Task Originator loop. 
     This will periodically create new tasks and submit them to the MessageBus.
     """
-    task_cycle = itertools.cycle(TASK_TYPES)    # NOTE: just for now, for testing.
 
-    while True:
-        task_type, task_id, \
-        in_data_privacy_lvl, \
-        out_data_privacy_lvl, \
-        task_priority, \
-        retry_attempt = await next_task(node, task_cycle)
+# EVALUATION TEST SETUP =================================================================
+    # Sleep for 20 seconds to make sure all nodes are ready
+    await asyncio.sleep(20)
+
+    # Read evaluation test cases from a JSON file
+    eval_test_cases = {}
+    with open(TEST_CASE_FILE, "r") as file:
+        eval_test_cases = json.load(file)
+
+    task_types = eval_test_cases["task_types"]
+    input_data_levels = eval_test_cases["input_data_levels"]
+    output_data_levels = eval_test_cases["output_data_levels"]
+    task_priorities = eval_test_cases["task_priorities"]
+
+    for i in range(len(task_types)):
+        task_id = str(uuid.uuid4())[:8]
+        task_type = task_types[i]
+        in_data_privacy_lvl = input_data_levels[i]
+        out_data_privacy_lvl = output_data_levels[i]
+        task_priority = task_priorities[i]
+        retry_attempt = 0
+
+# EVALUATION TEST SETUP: END =============================================================
+        
+
+#    task_cycle = itertools.cycle(TASK_TYPES)
+#
+#    while True:
+#        task_type, task_id, \
+#        in_data_privacy_lvl, \
+#        out_data_privacy_lvl, \
+#        task_priority, \
+#        retry_attempt = await next_task(node, task_cycle)
 
         if not node.peers:
             print(f"{TAG} No peers currently available. Wating for peers to join...")
@@ -365,8 +389,6 @@ async def start(node):
             for candidate in all_bids:
                 peer_id = candidate["node_id"]
 
-                #print(f"{TAG} Assigning task to node {peer_id}...")
-
                 task_assign_time = time()   # T3: task assignment sent
 
                 if await assign_task(node, peer_id, task_id, task_type):
@@ -380,18 +402,24 @@ async def start(node):
                     t2 = negotiation_results.get("last_bid_time",   task_assign_time)
                     t3 = task_assign_time
 
-                    lat_negotiation = (t2 - t1) * 1000   # broadcast -> last bid
-                    lat_assignment  = (t3 - t2) * 1000   # last bid  -> task assign
+                    #lat_negotiation = (t2 - t1) * 1000   # broadcast -> last bid
+                    #lat_assignment  = (t3 - t2) * 1000   # last bid  -> task assign
                     lat_total       = (t3 - t1) * 1000   # broadcast -> task assign
 
-                    # TODO: do we have to await this?
-                    #log_latency(task_type,
-                    #    winner_id, negotiation_results["score"],
-                    #    negotiation_results["adj_score"],
-                    #    lat_negotiation_ms=lat_negotiation,
-                    #    lat_assignment_ms=lat_assignment,
-                    #    lat_total_ms=lat_total,
-                    #    retry_attempt=retry_attempt)
+                    #save_offloading_decision_result(i, peer_id,
+                    #            candidate["peer_lan"],
+                    #            task_id, task_type, in_data_privacy_lvl, out_data_privacy_lvl, task_priority,
+                    #            candidate["score"], candidate["adj_score"], candidate["pr_score"], candidate["w_product"],
+                    #            candidate["reliability_lvl"], candidate["privacy_lvl"],
+                    #            candidate["decision"],
+                    #            lat_total,
+                    #            retry_attempt)
+
+                    save_offloading_decision_result(i, task_id, task_type, in_data_privacy_lvl, out_data_privacy_lvl, task_priority,
+                                peer_id, candidate["peer_lan"], candidate["adj_score"], candidate["pr_score"], candidate["w_product"],
+                                candidate["reliability_lvl"], candidate["privacy_lvl"], candidate["decision"],
+                                all_bids, lat_total, retry_attempt)
+                    
                     asyncio.create_task(task_monitor_and_failover_loop(node, task_id, task_type, candidate, retry_attempt))
                     break
                 else:
@@ -402,10 +430,18 @@ async def start(node):
 
             if not assigned:
                 print(f"{TAG} Task assignment failed for all nodes.")
-                await enqueue_retry(node, task_type, task_id, retry_attempt)
+                save_failed_offloading_result(i, task_id, task_type, 
+                                              in_data_privacy_lvl, out_data_privacy_lvl, task_priority,
+                                              failure_reason="Task assignment failed")
+                # NOTE: COMMENTED OUT FOR EVALUATION TESTS
+                #await enqueue_retry(node, task_type, task_id, retry_attempt)
 
         else:
             print(f"{TAG} No valid bids for task {task_id} -- retry task")
-            await enqueue_retry(node, task_type, task_id, retry_attempt)
+            save_failed_offloading_result(i, task_id, task_type, 
+                                              in_data_privacy_lvl, out_data_privacy_lvl, task_priority,
+                                              failure_reason="No valid bids for task")
+            # NOTE: COMMENTED OUT FOR EVALUATION TESTS
+            #await enqueue_retry(node, task_type, task_id, retry_attempt)
 
         await asyncio.sleep(TASK_INTERVAL) 
