@@ -21,7 +21,6 @@ from typing import Callable, Optional
 
 TAG = "[BUS]"
 TOPIC_HEARTBEAT = "heartbeat"
-TOPIC_TASK_REQUEST = "task_request"
 BID_TIMEOUT = 90.0
 
 
