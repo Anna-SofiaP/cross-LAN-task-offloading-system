@@ -58,7 +58,9 @@ class Node:
 
         # Record the number of node failures based on the restart timestamps
         # The very first restart timestamp is not counted as a failure, since it's the initial start of the node.
-        node_failures = len(init_state.get("restart-times", []))-1
+        # NOTE: THIS SETUP FOR EVALUATION TESTS!
+        #node_failures = len(init_state.get("restart-times", []))-1
+        node_failures = init_state.get("restart_times")
 
         self.state = dict(score=0.5, risk="MEDIUM",
                    reputation=0.5, reliability=0.6, 
@@ -71,7 +73,10 @@ class Node:
                    tasks_assigned=init_state.get("tasks-assigned", 0),
                    network_trust_score=network_trust_score, 
                    usr_type_score=device_user_type_score,
-                   node_failures=node_failures,)
+                   node_failures=node_failures,
+                   reliability_lvl=init_state.get("reliability-lvl"),   # NOTE: for eval tests!
+                   privacy_lvl=init_state.get("privacy-lvl")            # NOTE: for eval tests!
+                   )
         
         #self.task_cache = init_state.get("task_cache", [])
         self.task_queue = deque()           # TODO: should this be in state json file?
@@ -147,26 +152,31 @@ if __name__ == "__main__":
     config = {}
     init_node_state = {}
 
+# NOTE: FOR EVALUATION TESTS ----------------------------------------------
     with open(TEST_SETUP_FILE, "r") as test_setup_f:
         test_setup = json.load(test_setup_f)
 
-    round1 = test_setup["round-1"]
+    rnd = test_setup["round-1"] # NOTE: change to "round-2" for the test round 2 setup
 
     init_node_state = {
-        "restart-times": round1["node-failures"],
+        "restart-times": rnd["node-failures"],
         "tasks-assigned": test_setup["tasks-assigned"],
-        "tasks-completed": round1["tasks-completed"],
+        "tasks-completed": rnd["tasks-completed"],
         "assigned-task-counts": test_setup["assigned-task-counts"],
-        "completed-tasks-results": []
+        "completed-tasks-results": [],
+        "reliability-lvl": rnd["reliability-lvl"],
+        "privacy-lvl": rnd["privacy-lvl"]
     }
 
+# -------------------------------------------------------------------------
+
+    with open(CONFIG_FILE) as stream:
+        try:
+            config = yaml.safe_load(stream)
+        except yaml.YAMLError as exc:
+            print(exc)
+
 # NOTE: COMMENTED OUT FOR EVALUATION TESTS
-#    with open(CONFIG_FILE) as stream:
-#        try:
-#            config = yaml.safe_load(stream)
-#        except yaml.YAMLError as exc:
-#            print(exc)
-#
 #    if os.path.exists(NODE_STATE_FILE):
 #        with open(NODE_STATE_FILE, "r") as file:
 #            init_node_state = json.load(file)
@@ -181,18 +191,19 @@ if __name__ == "__main__":
 
     print(f"{TAG} Initial node state:\n\t{init_node_state}")
 
-    # Record the time of new node restart and add to the restart list
-    new_restart_time = time.time()
-    init_node_state["restart-times"].append(new_restart_time)
-
-    # Remove restart timestamps older than 7 days
-    print(f"{TAG} Remove restart timestamps older than {NODE_FAILURE_LOGGING_PERIOD} days...")
-
-    restart_times = init_node_state.get("restart-times", [])
-    if restart_times:
-        updated_restart_times = [old_restart_time for old_restart_time in restart_times 
-                                 if (new_restart_time - old_restart_time) <= NODE_FAILURE_LOGGING_PERIOD * 24 * 60 * 60]
-        init_node_state["restart-times"] = updated_restart_times
+# NOTE: COMMENTED OUT FOR EVALUATION TESTS
+#    # Record the time of new node restart and add to the restart list
+#    new_restart_time = time.time()
+#    init_node_state["restart-times"].append(new_restart_time)
+#
+#    # Remove restart timestamps older than 7 days
+#    print(f"{TAG} Remove restart timestamps older than {NODE_FAILURE_LOGGING_PERIOD} days...")
+#
+#    restart_times = init_node_state.get("restart-times", [])
+#    if restart_times:
+#        updated_restart_times = [old_restart_time for old_restart_time in restart_times 
+#                                 if (new_restart_time - old_restart_time) <= NODE_FAILURE_LOGGING_PERIOD * 24 * 60 * 60]
+#        init_node_state["restart-times"] = updated_restart_times
 
     node = Node(node_id = config["nid"], 
                 lan = config["lan"], 
@@ -200,8 +211,8 @@ if __name__ == "__main__":
                 lstm_model_path = config["lstm-model"],
                 llm_model_path = config["llm-model"],
                 # NOTE: FOR EVALUATION TESTS
-                device_user_category = round1["device-user-category"],
-                network_type = test_setup["network-type"],
+                device_user_category = rnd["device-user-category"],
+                network_type = rnd["network-type"],
                 # NOTE: COMMENTED OUT FOR EVALUATION TESTS
                 #device_user_category = config.get("device-user-category", "public"),
                 #network_type = config.get("network-type", "public-network"),
