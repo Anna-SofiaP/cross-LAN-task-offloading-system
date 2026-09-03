@@ -115,17 +115,26 @@ def reliability_and_privacy_assessment(bid: dict, in_data_privacy_lvl, out_data_
 
     # Required privacy and reliability levels for the task
     in_privacy_requirement = level_to_scalar(TASK_DATA_PRIVACY_REQUIREMENTS.get(in_data_privacy_lvl, "CONFIDENTIAL"))
-    #out_privacy_requirement = level_to_scalar(TASK_DATA_PRIVACY_REQUIREMENTS.get(out_data_privacy_lvl, "PUBLIC"))
+    out_privacy_requirement = level_to_scalar(TASK_DATA_PRIVACY_REQUIREMENTS.get(out_data_privacy_lvl, "PUBLIC"))
     reliability_requirement = level_to_scalar(TASK_PRIORITY_REQUIREMENTS.get(task_priority, "MEDIUM"))
 
-    if (in_data_privacy_lvl in ["CONFIDENTIAL", "RESTRICTED"]) and (peer_lan != my_lan):
-        print(f"{TAG} Node does not meet task's strict input data privacy requirement -- discarding node")
-        bid["pr_score"] = DISCARD_LIMIT
-        return DISCARD_LIMIT
+    # NOTE: Old offloading logic. Trying something else...
+    #if (in_data_privacy_lvl in ["CONFIDENTIAL", "RESTRICTED"]) and (peer_lan != my_lan):
+    #    print(f"{TAG} Node does not meet task's strict input data privacy requirement -- discarding node")
+    #    bid["pr_score"] = DISCARD_LIMIT
+    #    return DISCARD_LIMIT
+
+    privacy_requirement = 3     # Default value
+    if (in_privacy_requirement >= out_privacy_requirement):
+        privacy_requirement = in_privacy_requirement
+    else:
+        privacy_requirement = out_privacy_requirement
 
     # Calculate difference between node privacy/reliability level and task requirements
-    p_delta = node_privacy_lvl - in_privacy_requirement if node_privacy_lvl >= in_privacy_requirement else DISCARD_LIMIT
-    r_delta = node_reliability_lvl - reliability_requirement if node_reliability_lvl >= reliability_requirement else DISCARD_LIMIT
+    #p_delta = node_privacy_lvl - in_privacy_requirement if node_privacy_lvl >= in_privacy_requirement else DISCARD_LIMIT
+    #r_delta = node_reliability_lvl - reliability_requirement if node_reliability_lvl >= reliability_requirement else DISCARD_LIMIT
+    p_delta = node_privacy_lvl - privacy_requirement    # NOTE: old: in_privacy_requirement
+    r_delta = node_reliability_lvl - reliability_requirement
 
     # Discard nodes with too big a gap between task requirement and node privacy or reliability level
     if p_delta == DISCARD_LIMIT or r_delta == DISCARD_LIMIT:
