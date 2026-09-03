@@ -20,7 +20,7 @@ FAILOVER_TIMEOUT        = 60
 HEARTBEAT_INTERVAL      = 20
 
 # Evaluation tests --------------------------------------------------------------
-TEST_CASE_FILE = "./evaluation_tests/test_task_cases.json"
+TEST_CASE_FILE = "./evaluation_tests/task_cases_1_b.json"
 
 
 @dataclass
@@ -340,6 +340,7 @@ async def start(node):
     input_data_levels = eval_test_cases["input_data_levels"]
     output_data_levels = eval_test_cases["output_data_levels"]
     task_priorities = eval_test_cases["task_priorities"]
+    expected_results = eval_test_cases["expected_results"]
 
     for i in range(len(task_types)):
         task_id = str(uuid.uuid4())[:8]
@@ -347,6 +348,7 @@ async def start(node):
         in_data_privacy_lvl = input_data_levels[i]
         out_data_privacy_lvl = output_data_levels[i]
         task_priority = task_priorities[i]
+        expected_result = expected_results[i]
         retry_attempt = 0
 
 # EVALUATION TEST SETUP: END =============================================================
@@ -418,7 +420,7 @@ async def start(node):
                     save_offloading_decision_result(i, task_id, task_type, in_data_privacy_lvl, out_data_privacy_lvl, task_priority,
                                 peer_id, candidate["peer_lan"], candidate["adj_score"], candidate["pr_score"], candidate["w_product"],
                                 candidate["reliability_lvl"], candidate["privacy_lvl"], candidate["decision"],
-                                all_bids, lat_total, retry_attempt)
+                                all_bids, lat_total, retry_attempt, expected_result)
                     
                     asyncio.create_task(task_monitor_and_failover_loop(node, task_id, task_type, candidate, retry_attempt))
                     break
