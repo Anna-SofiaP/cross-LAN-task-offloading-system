@@ -1,23 +1,16 @@
 # Node and task matching ------------------------------------------------------------
 TASK_DATA_PRIVACY_REQUIREMENTS = {  # Match task in data privacy and out data privacy levels with node privacy level
-    "PUBLIC":       "low",
-    "INTERNAL":     "moderate",
-    "CONFIDENTIAL": "high",
-    "RESTRICTED":   "high",
-}
-
-
-TASK_PRIORITY_REQUIREMENTS = {  # Match task priority level with node reliability level
-    "LOW":          "low",
-    "MEDIUM":       "moderate",
-    "HIGH":         "high",
+    "PUBLIC":       "LOW",
+    "INTERNAL":     "MODERATE",
+    "CONFIDENTIAL": "HIGH",
+    "RESTRICTED":   "HIGH",
 }
 
 # Scalar values to reliability and privacy levels -----------------------------------
 LEVELS_TO_SCALARS = {
-    "high": 3,
-    "moderate": 2,
-    "low": 1
+    "HIGH": 3,
+    "MODERATE": 2,
+    "LOW": 1
 }
 
 # Score calculation constants -------------------------------------------------------
@@ -110,13 +103,13 @@ def reliability_and_privacy_assessment(bid: dict, in_data_privacy_lvl, out_data_
     peer_id = bid.get("node_id")
     peer_lan = bid.get("peer_lan")
 
-    node_reliability_lvl = level_to_scalar(bid.get("reliability_lvl", "moderate"))    # In reliability it is okay to give the node a chance
-    node_privacy_lvl = level_to_scalar(bid.get("privacy_lvl", "low"))                 # Do not trust nodes by default regarding privacy
+    node_reliability_lvl = level_to_scalar(bid.get("reliability_lvl", "MODERATE"))    # In reliability it is okay to give the node a chance
+    node_privacy_lvl = level_to_scalar(bid.get("privacy_lvl", "LOW"))                 # Do not trust nodes by default regarding privacy
 
     # Required privacy and reliability levels for the task
     in_privacy_requirement = level_to_scalar(TASK_DATA_PRIVACY_REQUIREMENTS.get(in_data_privacy_lvl, "CONFIDENTIAL"))
     out_privacy_requirement = level_to_scalar(TASK_DATA_PRIVACY_REQUIREMENTS.get(out_data_privacy_lvl, "PUBLIC"))
-    reliability_requirement = level_to_scalar(TASK_PRIORITY_REQUIREMENTS.get(task_priority, "MEDIUM"))
+    reliability_requirement = level_to_scalar(task_priority)
 
     # NOTE: Old offloading logic. Trying something else...
     #if (in_data_privacy_lvl in ["CONFIDENTIAL", "RESTRICTED"]) and (peer_lan != my_lan):
