@@ -307,8 +307,11 @@ class MessageBus:
         while True:
             try:
                 raw = await self.rep_sock.recv_string()
+                print(f"{TAG} Received ZMQ message: {raw}")
                 data = json.loads(raw)
+                print(f"{TAG} Parsed ZMQ message: {data}")
                 msg = Message(**data)
+                print(f"{TAG} Dispatching ZMQ message of type {msg.type} from {msg.originator_node}...\n")
 
                 # Dispatch to registered handler and get reply
                 reply = await self._dispatch(msg)
