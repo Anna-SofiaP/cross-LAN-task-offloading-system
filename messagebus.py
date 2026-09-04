@@ -328,6 +328,8 @@ class MessageBus:
         #print(f"{TAG} Dispatching message of type {msg.type} to handler...\n")
 
         handler = self._handlers.get(msg.type)
+        print(f"{TAG} Dispatching message of type {msg.type} to handler: {handler}\n")
+        print(f"{TAG} Message content: {str(msg)}\n")
 
         if handler:
             result = handler(self.node, msg.payload, msg.originator_lan, msg.originator_node)
