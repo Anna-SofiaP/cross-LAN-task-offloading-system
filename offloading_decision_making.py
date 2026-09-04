@@ -78,10 +78,10 @@ def load_balanced_score(node, bid: dict, all_bidders: list = None) -> float:
     bonus   = NEW_NODE_BONUS if peer_task_assign_counts == 0 else 0.0
     adj     = round(raw - penalty + bonus, 4)
 
-    print(f"{TAG} Calculation results for {peer_id}:" \
-          f"    penalty = {penalty}" \
-          f"    bonus = {bonus}" \
-          f"    adjusted score = {adj}")
+    #print(f"{TAG} Calculation results for {peer_id}:" \
+    #      f"    penalty = {penalty}" \
+    #      f"    bonus = {bonus}" \
+    #      f"    adjusted score = {adj}")
     
     final_score = max(0.0, min(1.0, adj))
     #bid["adj_score"] = final_score
@@ -123,6 +123,8 @@ def reliability_and_privacy_assessment(bid: dict, in_data_privacy_lvl, out_data_
     else:
         privacy_requirement = out_privacy_requirement
 
+    print(f"{TAG} Privacy requirement of the task: {privacy_requirement}")
+
     # Calculate difference between node privacy/reliability level and task requirements
     #p_delta = node_privacy_lvl - in_privacy_requirement if node_privacy_lvl >= in_privacy_requirement else DISCARD_LIMIT
     #r_delta = node_reliability_lvl - reliability_requirement if node_reliability_lvl >= reliability_requirement else DISCARD_LIMIT
@@ -132,7 +134,7 @@ def reliability_and_privacy_assessment(bid: dict, in_data_privacy_lvl, out_data_
     # Discard nodes with too big a gap between task requirement and node privacy or reliability level
     if p_delta == DISCARD_LIMIT or r_delta == DISCARD_LIMIT:
         print(f"{TAG} Node {peer_id} has too low p_delta={p_delta} or r_delta={r_delta} value -- discarding node")
-        bid["pr_score"] = DISCARD_LIMIT
+        #bid["pr_score"] = DISCARD_LIMIT
         return DISCARD_LIMIT
     
     # If p_delta or r_delta value is -1, don't discard, but give the node a higher w_sum value than in the actual w_sum calculation
