@@ -6,11 +6,23 @@ import torch
 ACCEPT_SCORE_MIN = 0.50
 TAG = "[LLM]"
 
+#TASK_PROFILES = {
+#    "CLASSIFICATION": ("moderate CPU", "low memory",      "ML classification"),
+#    "CV_INFERENCE":   ("high CPU",     "moderate memory", "computer vision"),
+#    "TIMESERIES":     ("moderate CPU", "moderate memory", "time-series LSTM"),
+#    "GENERIC":        ("moderate CPU", "moderate memory", "general compute"),
+#}
+
 TASK_PROFILES = {
-    "CLASSIFICATION": ("moderate CPU", "low memory",      "ML classification"),
-    "CV_INFERENCE":   ("high CPU",     "moderate memory", "computer vision"),
-    "TIMESERIES":     ("moderate CPU", "moderate memory", "time-series LSTM"),
-    "GENERIC":        ("moderate CPU", "moderate memory", "general compute"),
+    "USR_INPUT_ANALYSIS":   ("moderate CPU",    "moderate memory",  "user input analysis"),
+    "ANIMATION_RENDERING":  ("high CPU",        "moderate memory",  "animation rendering"),
+    "LLM_INFERENCE":        ("high CPU",        "high memory",      "large language model inference"),
+    "LAB_RESULT_ANALYSIS":  ("moderate CPU",    "moderate memory",  "laboratory result analysis"),
+    "DATA_PREPROCESSING":   ("moderate CPU",    "moderate memory",  "data preprocessing"),
+    "RUN_SIMULATION":       ("high CPU",        "high memory",      "simulation execution"),
+    "EXPERIMENT_PIPELINE":  ("high CPU",        "high memory",      "experiment pipeline execution"),
+    "TRAIN_ML_MODEL":       ("high CPU",        "high memory",      "machine learning model training"),
+    "GENERIC":              ("low CPU",         "low memory",       "general compute")
 }
 
 
@@ -53,7 +65,7 @@ def local_llm_decide(state: dict, node_id: str, llm_tok, llm_mdl, task_type: str
     
     # Build decision word SEPARATELY -- no nested f-string
     dw   = "REJECT" if hard_reject else "ACCEPT"
-    rule = ("REJECT: score below threshold, CRITICAL risk, node busy, or node does not meet task's output data privacy requirement."
+    rule = ("REJECT: score below threshold, CRITICAL risk, or node busy."
             if hard_reject else
             "ACCEPT: all thresholds met, node is available.")
 
@@ -66,17 +78,24 @@ def local_llm_decide(state: dict, node_id: str, llm_tok, llm_mdl, task_type: str
     score_gap = score - ACCEPT_SCORE_MIN
 
     # Task type-specific fit assessment
-    if task_type == "CV_INFERENCE":
-        fit_note = (f"CV_INFERENCE needs high CPU; current CPU={cpu:.1f}% "
-                    f"predicted {cpu_p:.1f}% ({cpu_trend})")
-    elif task_type == "CLASSIFICATION":
-        fit_note = (f"CLASSIFICATION needs moderate CPU; current CPU={cpu:.1f}% "
-                    f"({lvl(cpu,30,65)}), memory={mem:.1f}% ({lvl(mem,40,70)})")
-    elif task_type == "TIMESERIES":
-        fit_note = (f"TIMESERIES needs moderate CPU and memory; "
-                    f"CPU={cpu:.1f}%({cpu_trend}), mem={mem:.1f}%({mem_trend})")
-    else:
-        fit_note = f"CPU={cpu:.1f}%, mem={mem:.1f}%, score={score:.4f}"
+    # NOTE: commented out for eval tests! -----------------------------------------------
+    #if task_type == "CV_INFERENCE":
+    #    fit_note = (f"CV_INFERENCE needs high CPU; current CPU={cpu:.1f}% "
+    #                f"predicted {cpu_p:.1f}% ({cpu_trend})")
+    #elif task_type == "CLASSIFICATION":
+    #    fit_note = (f"CLASSIFICATION needs moderate CPU; current CPU={cpu:.1f}% "
+    #                f"({lvl(cpu,30,65)}), memory={mem:.1f}% ({lvl(mem,40,70)})")
+    #elif task_type == "TIMESERIES":
+    #    fit_note = (f"TIMESERIES needs moderate CPU and memory; "
+    #                f"CPU={cpu:.1f}%({cpu_trend}), mem={mem:.1f}%({mem_trend})")
+    #else:
+    #    fit_note = f"CPU={cpu:.1f}%, mem={mem:.1f}%, score={score:.4f}"
+
+    # NOTE: for eval tests!
+    task_profile = TASK_PROFILES.get(task_type, TASK_PROFILES["GENERIC"])
+    fit_note = (f"{task_profile[2]} requires {task_profile[0]} and {task_profile[1]}; "
+                f"current CPU={cpu:.1f}%({cpu_trend}), mem={mem:.1f}%({mem_trend}), score={score:.4f}")
+    # ------------------------------------------------------------------------------------
 
 
     system_msg = (
