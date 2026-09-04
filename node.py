@@ -21,7 +21,7 @@ import task_originator
 import monitor
 import asyncio
 import tensorflow as tf
-from messagebus import MessageBus
+from messagebus import MessageBus, get_local_ip
 import agent
 import yaml
 import json
@@ -43,7 +43,8 @@ class Node:
                  device_user_category: str, network_type: str, init_state: dict):
         self.id = node_id
         self.lan = lan
-        self.peers = []  # tuple: ("lan": str, "node_id": node_id, "ip": str|None)
+        # NOTE: List for storing peer information. Initialize with information about this node.
+        self.peers = [(lan, node_id, get_local_ip())]  # tuple: ("lan": str, "node_id": node_id, "ip": str|None)
         self.assigned_task_counts = init_state.get("assigned-task-counts", {})  # number of tasks assigned to each peer node
 
         print(f"{TAG} Loading LSTM ...")
