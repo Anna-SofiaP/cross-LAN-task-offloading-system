@@ -26,11 +26,6 @@ def compute_rep(tasks_assigned, tasks_completed):
     if tasks_assigned == 0:
         return 0.5
     return max(0.0, min(1.0, (tasks_completed + 3) / (tasks_assigned + 6)))
-    #c = list(node_task_cache)
-    #if not c: 
-    #    return 0.5
-    #s = sum(1 for t in c if t.get("success")==1)
-    #return max(0.0, min(1.0, (s+3)/(len(c)+6)))
 
 
 #def compute_rel(node_task_cache):
@@ -40,11 +35,6 @@ def compute_rel(tasks_assigned, tasks_completed):
         return 0.6
     on = tasks_completed / tasks_assigned
     return max(0.0, min(1.0, 0.7*on + 0.3))
-    #c = list(node_task_cache)
-    #if len(c) < 3: 
-    #    return 0.6
-    #on = sum(1 for t in c if t.get("success")==1)/len(c)
-    #return max(0.0, min(1.0, 0.7*on+0.3))
 
 
 def compute_score(horizon, rep, rel):

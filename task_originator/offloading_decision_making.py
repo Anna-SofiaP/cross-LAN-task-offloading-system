@@ -1,23 +1,16 @@
 # Node and task matching ------------------------------------------------------------
 TASK_DATA_PRIVACY_REQUIREMENTS = {  # Match task in data privacy and out data privacy levels with node privacy level
-    "PUBLIC":       "low",
-    "INTERNAL":     "moderate",
-    "CONFIDENTIAL": "high",
-    "RESTRICTED":   "high",
-}
-
-
-TASK_PRIORITY_REQUIREMENTS = {  # Match task priority level with node reliability level
-    "LOW":          "low",
-    "MEDIUM":       "moderate",
-    "HIGH":         "high",
+    "PUBLIC":       "LOW",
+    "INTERNAL":     "MODERATE",
+    "CONFIDENTIAL": "HIGH",
+    "RESTRICTED":   "HIGH",
 }
 
 # Scalar values to reliability and privacy levels -----------------------------------
 LEVELS_TO_SCALARS = {
-    "high": 3,
-    "moderate": 2,
-    "low": 1
+    "HIGH": 3,
+    "MODERATE": 2,
+    "LOW": 1
 }
 
 # Score calculation constants -------------------------------------------------------
@@ -30,8 +23,8 @@ ABSOLUTE_DIFFERENCE_LIMIT = -1
 LOW_W_SUM_PENALTY_VAL = 1.2
 HIGH_W_SUM_PENALTY_VAL = 1.5
 ZERO_SAFEGUARD = 0.1    # To prevent weighted sum from being 0 (and division by that 0 later in the code)
-PRIVACY_WEIGHT = 0.5
-RELIABILITY_WEIGHT = 0.5
+PRIVACY_WEIGHT = 0.6
+RELIABILITY_WEIGHT = 0.4
 
 PR_SCORE_WEIGHT = 0.6       # NOTE: PR = privacy-reliability
 ADJ_SCORE_WEIGHT = 0.4      # NOTE: ADJ = adjusted
@@ -85,10 +78,10 @@ def load_balanced_score(node, bid: dict, all_bidders: list = None) -> float:
     bonus   = NEW_NODE_BONUS if peer_task_assign_counts == 0 else 0.0
     adj     = round(raw - penalty + bonus, 4)
 
-    print(f"{TAG} Calculation results for {peer_id}:" \
-          f"    penalty = {penalty}" \
-          f"    bonus = {bonus}" \
-          f"    adjusted score = {adj}")
+    #print(f"{TAG} Calculation results for {peer_id}:" \
+    #      f"    penalty = {penalty}" \
+    #      f"    bonus = {bonus}" \
+    #      f"    adjusted score = {adj}")
     
     final_score = max(0.0, min(1.0, adj))
     #bid["adj_score"] = final_score
@@ -96,8 +89,6 @@ def load_balanced_score(node, bid: dict, all_bidders: list = None) -> float:
     return final_score
 
 
-
-# TODO: Remove, and just use scalars in the whole level assignment process!
 def level_to_scalar(level):
     scalar = LEVELS_TO_SCALARS[level]
     #print(f"{TAG} Level: {level}, Scalar: {scalar}, Scalar type: {type(scalar)}")
@@ -110,34 +101,36 @@ def reliability_and_privacy_assessment(bid: dict, in_data_privacy_lvl, out_data_
     peer_id = bid.get("node_id")
     peer_lan = bid.get("peer_lan")
 
-    node_reliability_lvl = level_to_scalar(bid.get("reliability_lvl", "moderate"))    # In reliability it is okay to give the node a chance
-    node_privacy_lvl = level_to_scalar(bid.get("privacy_lvl", "low"))                 # Do not trust nodes by default regarding privacy
+    node_reliability_lvl = level_to_scalar(bid.get("reliability_lvl", "MODERATE"))    # In reliability it is okay to give the node a chance
+    node_privacy_lvl = level_to_scalar(bid.get("privacy_lvl", "LOW"))                 # Do not trust nodes by default regarding privacy
 
     # Required privacy and reliability levels for the task
     in_privacy_requirement = level_to_scalar(TASK_DATA_PRIVACY_REQUIREMENTS.get(in_data_privacy_lvl, "CONFIDENTIAL"))
-    #out_privacy_requirement = level_to_scalar(TASK_DATA_PRIVACY_REQUIREMENTS.get(out_data_privacy_lvl, "PUBLIC"))
-    reliability_requirement = level_to_scalar(TASK_PRIORITY_REQUIREMENTS.get(task_priority, "MEDIUM"))
+    out_privacy_requirement = level_to_scalar(TASK_DATA_PRIVACY_REQUIREMENTS.get(out_data_privacy_lvl, "PUBLIC"))
+    reliability_requirement = level_to_scalar(task_priority)
 
-    if (in_data_privacy_lvl in ["CONFIDENTIAL", "RESTRICTED"]) and (peer_lan != my_lan):
-        print(f"{TAG} Node does not meet task's strict input data privacy requirement -- discarding node")
-        bid["pr_score"] = DISCARD_LIMIT
-        return DISCARD_LIMIT
+    privacy_requirement = 3     # Default value
+    if (in_privacy_requirement >= out_privacy_requirement):
+        privacy_requirement = in_privacy_requirement
+    else:
+        privacy_requirement = out_privacy_requirement
+
+    print(f"{TAG} Privacy requirement of the task: {privacy_requirement}")
 
     # Calculate difference between node privacy/reliability level and task requirements
-    p_delta = node_privacy_lvl - in_privacy_requirement if node_privacy_lvl >= in_privacy_requirement else DISCARD_LIMIT
-    r_delta = node_reliability_lvl - reliability_requirement if node_reliability_lvl >= reliability_requirement else DISCARD_LIMIT
+    p_delta = node_privacy_lvl - privacy_requirement
+    r_delta = node_reliability_lvl - reliability_requirement
 
     # Discard nodes with too big a gap between task requirement and node privacy or reliability level
     if p_delta == DISCARD_LIMIT or r_delta == DISCARD_LIMIT:
         print(f"{TAG} Node {peer_id} has too low p_delta={p_delta} or r_delta={r_delta} value -- discarding node")
-        bid["pr_score"] = DISCARD_LIMIT
         return DISCARD_LIMIT
     
     # If p_delta or r_delta value is -1, don't discard, but give the node a higher w_sum value than in the actual w_sum calculation
-    if p_delta == ABSOLUTE_DIFFERENCE_LIMIT and r_delta == ABSOLUTE_DIFFERENCE_LIMIT:
+    if (p_delta == ABSOLUTE_DIFFERENCE_LIMIT) and (r_delta == ABSOLUTE_DIFFERENCE_LIMIT):
         print(f"{TAG} p_delta and r_delta are both slightly too low -- w_sum={HIGH_W_SUM_PENALTY_VAL}")
         return HIGH_W_SUM_PENALTY_VAL
-    elif p_delta == ABSOLUTE_DIFFERENCE_LIMIT ^ r_delta == ABSOLUTE_DIFFERENCE_LIMIT:
+    if (p_delta == ABSOLUTE_DIFFERENCE_LIMIT) ^ (r_delta == ABSOLUTE_DIFFERENCE_LIMIT):
         print(f"{TAG} Either p_delta or r_delta has slightly too low value -- w_sum={LOW_W_SUM_PENALTY_VAL}")
         return LOW_W_SUM_PENALTY_VAL
     
@@ -149,8 +142,6 @@ def reliability_and_privacy_assessment(bid: dict, in_data_privacy_lvl, out_data_
     w_sum = (PRIVACY_WEIGHT * p_norm + RELIABILITY_WEIGHT * r_norm) + ZERO_SAFEGUARD
 
     print(f"{TAG} {peer_id}: p_delta={p_delta}, r_delta={r_delta}, p_norm={p_norm}, r_norm={r_norm}, w_sum={w_sum}")
-
-    #bid["pr_score"] = w_sum
 
     return w_sum
 

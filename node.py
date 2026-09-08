@@ -17,25 +17,21 @@ import os
 import time
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
-import task_originator
-import monitor
+import task_originator.task_originator as task_originator
+import monitoring.monitor as monitor
 import asyncio
 import tensorflow as tf
 from messagebus import MessageBus
-import agent
+import agent.agent as agent
 import yaml
 import json
-from robustness_privacy_scoring import get_network_trustworthiness_score, get_device_user_type_score
+from agent.robustness_privacy_scoring import get_network_trustworthiness_score, get_device_user_type_score
 
 TAG = "[NODE]"
 CONFIG_FILE= "node_config.yaml"
 NODE_STATE_FILE = "node_state.json"
 HORIZON_H = 5
 NODE_FAILURE_LOGGING_PERIOD = 7  # days
-
-# Evaluation tests --------------------------------------------
-TEST_SETUP_FILE = "./evaluation_tests/test_round_setups_b.json"
-# -------------------------------------------------------------
 
 
 class Node:
@@ -103,7 +99,7 @@ class Node:
             monitor.heartbeat_loop(self),
             monitor.metric_loop(self),
             # Task originator loop
-            #task_originator.start(self),
+            task_originator.start(self),
             # ZMQ loop
             self.bus._zmq_listen_loop()
         )
@@ -147,37 +143,23 @@ if __name__ == "__main__":
     config = {}
     init_node_state = {}
 
-    with open(TEST_SETUP_FILE, "r") as test_setup_f:
-        test_setup = json.load(test_setup_f)
+    with open(CONFIG_FILE) as stream:
+        try:
+            config = yaml.safe_load(stream)
+        except yaml.YAMLError as exc:
+            print(exc)
 
-    round1 = test_setup["round-1"]
-
-    init_node_state = {
-        "restart-times": round1["node-failures"],
-        "tasks-assigned": test_setup["tasks-assigned"],
-        "tasks-completed": round1["tasks-completed"],
-        "assigned-task-counts": test_setup["assigned-task-counts"],
-        "completed-tasks-results": []
-    }
-
-# NOTE: COMMENTED OUT FOR EVALUATION TESTS
-#    with open(CONFIG_FILE) as stream:
-#        try:
-#            config = yaml.safe_load(stream)
-#        except yaml.YAMLError as exc:
-#            print(exc)
-#
-#    if os.path.exists(NODE_STATE_FILE):
-#        with open(NODE_STATE_FILE, "r") as file:
-#            init_node_state = json.load(file)
-#    else:
-#        init_node_state.update({
-#            "restart-times": [],
-#            "tasks-assigned": 0,
-#            "tasks-completed": 0,
-#            "assigned-task-counts": {},
-#            "completed-tasks-results": []
-#        })
+    if os.path.exists(NODE_STATE_FILE):
+        with open(NODE_STATE_FILE, "r") as file:
+            init_node_state = json.load(file)
+    else:
+        init_node_state.update({
+            "restart-times": [],
+            "tasks-assigned": 0,
+            "tasks-completed": 0,
+            "assigned-task-counts": {},
+            "completed-tasks-results": []
+        })
 
     print(f"{TAG} Initial node state:\n\t{init_node_state}")
 
@@ -199,12 +181,8 @@ if __name__ == "__main__":
                 nats_url = config["nats-url"],
                 lstm_model_path = config["lstm-model"],
                 llm_model_path = config["llm-model"],
-                # NOTE: FOR EVALUATION TESTS
-                device_user_category = round1["device-user-category"],
-                network_type = test_setup["network-type"],
-                # NOTE: COMMENTED OUT FOR EVALUATION TESTS
-                #device_user_category = config.get("device-user-category", "public"),
-                #network_type = config.get("network-type", "public-network"),
+                device_user_category = config.get("device-user-category", "public"),
+                network_type = config.get("network-type", "public-network"),
                 init_state=init_node_state)
 
     # Write the updated node state back to the JSON file (restart times list is updated)
@@ -217,6 +195,5 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print(f"\n{TAG} Node {config["nid"]} shutting down.")
 
-    # NOTE: COMMENTED OUT FOR EVALUATION TESTS
-    #finally:
-    #    node.save_node_state(restart_times)       #Save the node's state to a JSON file
+    finally:
+        node.save_node_state(restart_times)       #Save the node's state to a JSON file

@@ -38,10 +38,6 @@ def handle_bid_request(node, bid_req: dict, originator_lan: str, originator_node
     task_id = bid_req.get("task_id")
     task_type = bid_req.get("task_type")
 
-    in_data_privacy_lvl = bid_req.get("in_data_privacy_lvl")
-    out_data_privacy_lvl = bid_req.get("out_data_privacy_lvl")
-    task_priority = bid_req.get("task_priority")
-
     print(f"\n{TAG} Received bid request: " +
           f"     task id={task_id}" +
           f"     type={task_type}\n")
@@ -56,17 +52,13 @@ def handle_bid_request(node, bid_req: dict, originator_lan: str, originator_node
           f"risk={node_state['risk']}  busy={node_state.get('is_busy', False)} " \
           f"reliability_level={reliability_level}  privacy_level={privacy_level}")
     
-    llm_decision = local_llm_decide(my_lan, originator_lan, node_state, node.id, node.llm_tok, node.llm_mdl, task_type, 
-                                    reliability_level, privacy_level, 
-                                    in_data_privacy_lvl, out_data_privacy_lvl, task_priority)
+    llm_decision = local_llm_decide(node_state, node.id, node.llm_tok, node.llm_mdl, task_type)
 
     if llm_decision["decision"] != "ACCEPT":
         print(f"{TAG} Not bidding -- REJECT")
         return {"type": "bid", "payload": {"task_id": task_id, "decision": "REJECT"}}
     
     print(f"{TAG} Decision: {llm_decision['decision']}\n  reason: {llm_decision['reason']}")
-
-    #print(f"{TAG} Sending bid with score={node_state['score']:.4f}")
 
     bid = {"type": "bid",
            "payload": {

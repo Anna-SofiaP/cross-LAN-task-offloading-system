@@ -29,7 +29,6 @@ the `max` values of that level.
 ## About forming of the levels
 The maximum and minimum values of the levels have been calculated and formulated roughly,
 by taking into account the different scores that are multiplied together to form the final score.
-...
 """
 
 TAG = "[LEVELS]"
@@ -38,8 +37,6 @@ TAG = "[LEVELS]"
 NODE_FAILURE_SCORE = [(0, 1, 1.0),          # (min_value, max_value, score):
                       (2, 3, 0.8),          # min_value: minimum no. of node failures in a 7 day period 
                       (4, 6, 0.6)]          # max_value: maximum no. of node failures in a 7 day period
-
-#NODE_ACCESS_SCORE = (1.0, 0.8) # 1.0 = node is in the same LAN as the task originator, 0.8 = node is in a different LAN
 
 RELIABILITY_LEVELS = {
                         "high": {
@@ -131,11 +128,9 @@ def get_reliability_level(node, node_state: dict, lan: str) -> str:
     # Task assignment success score: smoothing for new nodes (0.5), so no multiplication with zero
     task_assignment_success_score = completed_tasks / assigned_tasks if assigned_tasks > 0 else 0.5
     node_failure_score = get_node_failure_score(node_failures)
-    #node_access_score = NODE_ACCESS_SCORE[0] if my_lan == lan else NODE_ACCESS_SCORE[1]
 
     print(f"{TAG} task_assignment_score={task_assignment_success_score}, node_failure_score={node_failure_score}")
 
-    #combined_score = round(task_assignment_success_score * node_failure_score * node_access_score, 4)
     combined_score = round(task_assignment_success_score * node_failure_score, 4)
 
     print(f"{TAG} --> Combined reliability score: {combined_score}")
