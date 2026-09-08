@@ -1,0 +1,26 @@
+{
+    "tasks-assigned": 10,
+    "assigned-task-counts": {
+        "node-a": 10, 
+        "node-c": 10, 
+        "node-d": 10
+    },
+    "round-1": {
+        "network-type": "usr-auth-network",
+        "device-user-category": "business",
+        "role": "agent",
+        "node-failures": 0,
+        "tasks-completed": 10,
+        "reliability-lvl": "HIGH",
+        "privacy-lvl": "HIGH"
+    },
+    "round-2": {
+        "network-type": "usr-auth-network",
+        "device-user-category": "business",
+        "role": "agent",
+        "node-failures": 2,
+        "tasks-completed": 8,
+        "reliability-lvl": "HIGH",
+        "privacy-lvl": "HIGH"
+    }
+}

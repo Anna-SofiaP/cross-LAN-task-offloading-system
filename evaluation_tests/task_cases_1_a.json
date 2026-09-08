@@ -1,0 +1,39 @@
+{
+    "test_round": "round_1",
+    "task_originator": "node-a",
+    "task_types": [
+        "USR_INPUT_ANALYSIS",
+        "ANIMATION_RENDERING",
+        "LLM_INFERENCE",
+        "USR_INPUT_ANALYSIS",
+        "ANIMATION_RENDERING"
+    ],
+    "input_data_levels": [
+        "PUBLIC",
+        "INTERNAL",
+        "PUBLIC",
+        "CONFIDENTIAL",
+        "INTERNAL"
+    ],
+    "output_data_levels": [
+        "PUBLIC",
+        "INTERNAL",
+        "INTERNAL",
+        "CONFIDENTIAL",
+        "PUBLIC"
+    ],
+    "task_priorities": [
+        "MODERATE",
+        "MODERATE",
+        "LOW",
+        "MODERATE",
+        "HIGH"
+    ],
+    "expected_results": [
+        "node-b; node-c",
+        "node-c; node-d",
+        "node-c; node-d",
+        "node-d; none",
+        "node-c; node-d"
+    ]
+}

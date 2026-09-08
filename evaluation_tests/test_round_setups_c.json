@@ -1,0 +1,26 @@
+{
+    "tasks-assigned": 10,
+    "assigned-task-counts": {
+        "node-a": 10, 
+        "node-c": 10, 
+        "node-d": 10
+    },
+    "round-1": {
+        "network-type": "public-network",
+        "device-user-category": "personal",
+        "role": "agent",
+        "node-failures": 1,
+        "tasks-completed": 9,
+        "reliability-lvl": "HIGH",
+        "privacy-lvl": "MODERATE"
+    },
+    "round-2": {
+        "network-type": "private-network",
+        "device-user-category": "personal",
+        "role": "task-originator",
+        "node-failures": 1,
+        "tasks-completed": 10,
+        "reliability-lvl": "MODERATE",
+        "privacy-lvl": "HIGH"
+    }
+}

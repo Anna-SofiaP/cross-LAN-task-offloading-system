@@ -1,0 +1,39 @@
+{
+    "test_round": "round_2",
+    "task_originator": "node-a",
+    "task_types": [
+        "LAB_RESULT_ANALYSIS",
+        "DATA_PREPROCESSING",
+        "RUN_SIMULATION",
+        "EXPERIMENT_PIPELINE",
+        "TRAIN_ML_MODEL"
+    ],
+    "input_data_levels": [
+        "RESTRICTED",
+        "RESTRICTED",
+        "RESTRICTED",
+        "INTERNAL",
+        "RESTRICTED"
+    ],
+    "output_data_levels": [
+        "INTERNAL",
+        "RESTRICTED",
+        "CONFIDENTIAL",
+        "INTERNAL",
+        "INTERNAL"
+    ],
+    "task_priorities": [
+        "MODERATE",
+        "HIGH",
+        "HIGH",
+        "HIGH",
+        "HIGH"
+    ],
+    "expected_results": [
+        "node-c; any",
+        "node-a; node-b; node-d",
+        "node-a; node-b; node-d",
+        "node-a; node-b; node-d",
+        "node-a; node-b; node-d"
+    ]
+}
