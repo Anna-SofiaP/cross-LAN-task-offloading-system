@@ -23,8 +23,8 @@ ABSOLUTE_DIFFERENCE_LIMIT = -1
 LOW_W_SUM_PENALTY_VAL = 1.2
 HIGH_W_SUM_PENALTY_VAL = 1.5
 ZERO_SAFEGUARD = 0.1    # To prevent weighted sum from being 0 (and division by that 0 later in the code)
-PRIVACY_WEIGHT = 0.5
-RELIABILITY_WEIGHT = 0.5
+PRIVACY_WEIGHT = 0.6
+RELIABILITY_WEIGHT = 0.4
 
 PR_SCORE_WEIGHT = 0.6       # NOTE: PR = privacy-reliability
 ADJ_SCORE_WEIGHT = 0.4      # NOTE: ADJ = adjusted
@@ -138,10 +138,10 @@ def reliability_and_privacy_assessment(bid: dict, in_data_privacy_lvl, out_data_
         return DISCARD_LIMIT
     
     # If p_delta or r_delta value is -1, don't discard, but give the node a higher w_sum value than in the actual w_sum calculation
-    if p_delta == ABSOLUTE_DIFFERENCE_LIMIT and r_delta == ABSOLUTE_DIFFERENCE_LIMIT:
+    if (p_delta == ABSOLUTE_DIFFERENCE_LIMIT) and (r_delta == ABSOLUTE_DIFFERENCE_LIMIT):
         print(f"{TAG} p_delta and r_delta are both slightly too low -- w_sum={HIGH_W_SUM_PENALTY_VAL}")
         return HIGH_W_SUM_PENALTY_VAL
-    elif p_delta == ABSOLUTE_DIFFERENCE_LIMIT ^ r_delta == ABSOLUTE_DIFFERENCE_LIMIT:
+    if (p_delta == ABSOLUTE_DIFFERENCE_LIMIT) ^ (r_delta == ABSOLUTE_DIFFERENCE_LIMIT):
         print(f"{TAG} Either p_delta or r_delta has slightly too low value -- w_sum={LOW_W_SUM_PENALTY_VAL}")
         return LOW_W_SUM_PENALTY_VAL
     
