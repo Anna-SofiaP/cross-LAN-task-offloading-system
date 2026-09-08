@@ -1,0 +1,7 @@
+device-user-category: <DEVICE-USER-CATEGORY>
+lan: <LAN-ID-OR-NAME>
+llm-model: /path/to/your/llm-model
+lstm-model: /path/to/your/lstm-model
+nats-url: <NATS-URL:PORT>
+network-type: <NETWORK-TYPE>
+nid: <NODE-ID>
