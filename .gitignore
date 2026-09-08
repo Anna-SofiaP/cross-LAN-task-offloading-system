@@ -12,7 +12,11 @@ load_and_save_llm.py
 qwen2.5_local
 
 # Evaluation
-evaluation_tests/
+evaluation_tests/*.csv
+evaluation_tests/stuff.md
+evaluation_tests/*.pdf
+evaluation_tests/draw_charts.py
+evaluation_tests/draw_more_charts.py
 
 # Others
 .venv
