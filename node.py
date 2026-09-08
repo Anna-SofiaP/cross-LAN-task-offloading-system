@@ -17,15 +17,15 @@ import os
 import time
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
-import task_originator
-import monitor
+import task_originator.task_originator as task_originator
+import monitoring.monitor as monitor
 import asyncio
 import tensorflow as tf
 from messagebus import MessageBus, get_local_ip
-import agent
+import agent.agent as agent
 import yaml
 import json
-from robustness_privacy_scoring import get_network_trustworthiness_score, get_device_user_type_score
+from agent.robustness_privacy_scoring import get_network_trustworthiness_score, get_device_user_type_score
 
 TAG = "[NODE]"
 CONFIG_FILE= "node_config.yaml"
@@ -59,8 +59,6 @@ class Node:
 
         # Record the number of node failures based on the restart timestamps
         # The very first restart timestamp is not counted as a failure, since it's the initial start of the node.
-        # NOTE: THIS SETUP FOR EVALUATION TESTS!
-        #node_failures = len(init_state.get("restart-times", []))-1
         node_failures = init_state.get("restart_times")
 
         self.state = dict(score=0.5, risk="MEDIUM",
@@ -80,7 +78,7 @@ class Node:
                    )
         
         #self.task_cache = init_state.get("task_cache", [])
-        self.task_queue = deque()           # TODO: should this be in state json file?
+        self.task_queue = deque()
         self.completed_tasks_results = init_state.get("completed-tasks-results", [])
 
         print(f"{TAG} Loading LLM ...")
@@ -109,7 +107,7 @@ class Node:
             monitor.heartbeat_loop(self),
             monitor.metric_loop(self),
             # Task originator loop
-            #task_originator.start(self),
+            task_originator.start(self),
             # ZMQ loop
             self.bus._zmq_listen_loop()
         )
@@ -177,46 +175,15 @@ if __name__ == "__main__":
         except yaml.YAMLError as exc:
             print(exc)
 
-# NOTE: COMMENTED OUT FOR EVALUATION TESTS
-#    if os.path.exists(NODE_STATE_FILE):
-#        with open(NODE_STATE_FILE, "r") as file:
-#            init_node_state = json.load(file)
-#    else:
-#        init_node_state.update({
-#            "restart-times": [],
-#            "tasks-assigned": 0,
-#            "tasks-completed": 0,
-#            "assigned-task-counts": {},
-#            "completed-tasks-results": []
-#        })
-
     print(f"{TAG} Initial node state:\n\t{init_node_state}")
-
-# NOTE: COMMENTED OUT FOR EVALUATION TESTS
-#    # Record the time of new node restart and add to the restart list
-#    new_restart_time = time.time()
-#    init_node_state["restart-times"].append(new_restart_time)
-#
-#    # Remove restart timestamps older than 7 days
-#    print(f"{TAG} Remove restart timestamps older than {NODE_FAILURE_LOGGING_PERIOD} days...")
-#
-#    restart_times = init_node_state.get("restart-times", [])
-#    if restart_times:
-#        updated_restart_times = [old_restart_time for old_restart_time in restart_times 
-#                                 if (new_restart_time - old_restart_time) <= NODE_FAILURE_LOGGING_PERIOD * 24 * 60 * 60]
-#        init_node_state["restart-times"] = updated_restart_times
 
     node = Node(node_id = config["nid"], 
                 lan = config["lan"], 
                 nats_url = config["nats-url"],
                 lstm_model_path = config["lstm-model"],
                 llm_model_path = config["llm-model"],
-                # NOTE: FOR EVALUATION TESTS
                 device_user_category = rnd["device-user-category"],
                 network_type = rnd["network-type"],
-                # NOTE: COMMENTED OUT FOR EVALUATION TESTS
-                #device_user_category = config.get("device-user-category", "public"),
-                #network_type = config.get("network-type", "public-network"),
                 init_state=init_node_state)
 
     # Write the updated node state back to the JSON file (restart times list is updated)
@@ -228,7 +195,3 @@ if __name__ == "__main__":
         asyncio.run(node.start())   # Run the node
     except KeyboardInterrupt:
         print(f"\n{TAG} Node {config["nid"]} shutting down.")
-
-    # NOTE: COMMENTED OUT FOR EVALUATION TESTS
-    #finally:
-    #    node.save_node_state(restart_times)       #Save the node's state to a JSON file
