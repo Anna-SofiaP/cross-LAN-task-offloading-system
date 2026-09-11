@@ -6,7 +6,7 @@
         "node-d": 10
     },
     "round-1": {
-        "network-type": "usr-auth-network",
+        "network-type": "credential-auth-network",
         "device-user-category": "business",
         "role": "agent",
         "node-failures": 0,
@@ -15,7 +15,7 @@
         "privacy-lvl": "HIGH"
     },
     "round-2": {
-        "network-type": "usr-auth-network",
+        "network-type": "credential-auth-network",
         "device-user-category": "business",
         "role": "agent",
         "node-failures": 2,

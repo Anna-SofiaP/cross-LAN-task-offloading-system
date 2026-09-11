@@ -59,7 +59,7 @@ DEVICE_USER_TYPE_SCORE = [("business", 1.0),
                    ("personal", 0.8), 
                    ("public", 0.6)]
 
-NETWORK_TRUST_SCORE = [("usr-auth-network", 1.0), 
+NETWORK_TRUST_SCORE = [("credential-auth-network", 1.0), 
                        ("private-network", 0.8), 
                        ("public-network", 0.6)]
 
