@@ -13,24 +13,8 @@ TASK_PROFILES = {
     "GENERIC":        ("moderate CPU", "moderate memory", "general compute"),
 }
 
-TASK_DATA_PRIVACY_REQUIREMENTS = {
-    "PUBLIC":       ("low privacy level", "moderate privacy level"),
-    "INTERNAL":     ("moderate privacy level", "high privacy level"),
-    "CONFIDENTIAL": ("high privacy level", "high privacy level"),
-    "RESTRICTED":   ("high privacy level", "high privacy level"),
-}
-# Example: if a task requires the processing of data of level "INTERNAL", then the node must have a privacy level of at least "moderate" and at most "high" to be suitable for the task.
 
-TASK_PRIORITY_REQUIREMENTS = {
-    "LOW":          ("low reliability level"),
-    "MEDIUM":       ("moderate reliability level"),
-    "HIGH":         ("high reliability level"),
-}
-# Example: if a task has priority "HIGH", then the node must have a reliability level of at least "high" to be suitable for the task.
-
-
-def local_llm_decide(my_lan: str, orig_lan: str, state: dict, node_id: str, llm_tok, llm_mdl, task_type: str, reliability_level: str, privacy_level: str,
-                                    in_data_privacy_lvl: str, out_data_privacy_lvl: str, task_priority: str) -> dict:
+def local_llm_decide(state: dict, node_id: str, llm_tok, llm_mdl, task_type: str) -> dict:
     print(f"{TAG} Running LLM decision for task of type {task_type}")
 
     cpu   = state["cpu"]      * 100
