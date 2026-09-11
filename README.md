@@ -14,5 +14,4 @@ In another terminal window, run the task allocator:
 $ python3 node.py
 ```
 
-## References:
 [^1]: Karthikeyan, Dinesh Kumar and Mikkonen, Tommi and Mäkitalo, Niko, From Reactive Scheduling to Adaptive Coordination: A Predictive - Cognitive System for Resource‑Aware Task Placement in Edge Environments. Available at SSRN: https://ssrn.com/abstract=6902610 or http://dx.doi.org/10.2139/ssrn.6902610 
